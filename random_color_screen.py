@@ -48,7 +48,7 @@ def show_title_screen(screen):
     
     # Title
     title_font = pygame.font.Font(None, 120)
-    title_text = title_font.render("Lucas Game", True, (255, 200, 50))
+    title_text = title_font.render("Lucas' Game", True, (255, 200, 50))
     title_x = (screen_width - title_text.get_width()) // 2
     title_y = screen_height // 6
     screen.blit(title_text, (title_x, title_y))

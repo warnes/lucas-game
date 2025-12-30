@@ -25,3 +25,11 @@ Thumbs.db
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.icns
+*.iconset/
+icon.png

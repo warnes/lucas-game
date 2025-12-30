@@ -80,6 +80,29 @@ python random_color_screen.py
 
 The game uses pygame for graphics and event handling, and sounddevice for audio generation. Each keypress triggers a random color fill and plays a musical note from the C major scale with a 1-second duration.
 
+## Building macOS Application
+
+To create a standalone macOS application:
+
+1. Follow the macOS installation instructions above
+
+2. Run the build script:
+```bash
+./build_macos.sh
+```
+
+3. The application will be created in `dist/Lucas' Game.app`
+
+4. Install by dragging to Applications folder or run:
+```bash
+open "dist/Lucas' Game.app"
+```
+
+The build script automatically:
+- Generates an application icon
+- Creates a standalone .app bundle with all dependencies
+- Signs the application for macOS
+
 ## License
 
 MIT License - Copyright (c) 2025 Gregory R. Warnes
