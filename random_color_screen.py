@@ -256,14 +256,14 @@ def main():
     """Main game loop."""
     clock = pygame.time.Clock()
     
-    # Hide mouse cursor to reduce distractions and discourage trackpad use
-    pygame.mouse.set_visible(False)
-    
     # Show title screen and get the starting key event
     start_event = show_title_screen(screen)
     if start_event is None:
         pygame.quit()
         return
+    
+    # Hide mouse cursor during gameplay to reduce distractions and discourage trackpad use
+    pygame.mouse.set_visible(False)
     
     running = True
     
