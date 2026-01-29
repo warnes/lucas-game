@@ -68,4 +68,4 @@ Note: Full end-to-end testing requires macOS environment with display, which is 
 ## References
 - Research document: `TRACKPAD_SWIPE_RESEARCH.md`
 - User documentation: `README.md` (section: "Preventing Accidental Trackpad Swipes")
-- Code changes: `random_color_screen.py` (lines 259-260, 307-310)
+- Code changes: `random_color_screen.py` (lines 265-266 for cursor hiding, lines 307-311 for mouse event capture)
