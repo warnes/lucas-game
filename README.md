@@ -94,7 +94,11 @@ Example configuration:
 }
 ```
 
-The `key` field should be a pygame key name (e.g., "ESCAPE", "Q", "F10"). The modifier keys (`ctrl`, `shift`, `alt`) can be set to `true` or `false`.
+The `key` field should be a pygame key constant name **without** the `K_` prefix:
+- **Correct**: `"ESCAPE"`, `"Q"`, `"F10"`, `"RETURN"`
+- **Incorrect**: `"K_ESCAPE"`, `"K_Q"`, `"esc"` (case-sensitive)
+
+The modifier keys (`ctrl`, `shift`, `alt`) can be set to `true` or `false`.
 
 The configuration file is automatically created with default values on first run. The default exit shortcut (Ctrl+Shift+Esc) is designed to be difficult for children to accidentally press.
 

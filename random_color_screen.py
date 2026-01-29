@@ -60,9 +60,17 @@ def load_config():
         try:
             with open(CONFIG_FILE, 'r') as f:
                 config = json.load(f)
-                # Validate required keys
+                # Validate required keys and structure
                 if 'exit_shortcut' in config:
-                    return config
+                    shortcut = config['exit_shortcut']
+                    # Check that all required fields exist and have correct types
+                    if (isinstance(shortcut.get('key'), str) and
+                        isinstance(shortcut.get('ctrl'), bool) and
+                        isinstance(shortcut.get('shift'), bool) and
+                        isinstance(shortcut.get('alt'), bool)):
+                        return config
+                    else:
+                        print("Warning: Invalid config structure, using defaults")
         except (json.JSONDecodeError, IOError) as e:
             print(f"Warning: Error loading config file: {e}")
     
@@ -79,60 +87,69 @@ def load_config():
 
 def get_exit_shortcut_display(config):
     """Get a human-readable display string for the exit shortcut."""
-    shortcut = config['exit_shortcut']
-    parts = []
-    
-    if shortcut.get('ctrl', False):
-        parts.append('Ctrl')
-    if shortcut.get('shift', False):
-        parts.append('Shift')
-    if shortcut.get('alt', False):
-        parts.append('Alt')
-    
-    # Map key names to display names
-    key = shortcut['key']
-    key_display = key.title() if key != 'ESCAPE' else 'Esc'
-    parts.append(key_display)
-    
-    return '+'.join(parts)
+    try:
+        shortcut = config['exit_shortcut']
+        parts = []
+        
+        if shortcut.get('ctrl', False):
+            parts.append('Ctrl')
+        if shortcut.get('shift', False):
+            parts.append('Shift')
+        if shortcut.get('alt', False):
+            parts.append('Alt')
+        
+        # Map key names to display names
+        key = shortcut['key']
+        key_display = key.title() if key != 'ESCAPE' else 'Esc'
+        parts.append(key_display)
+        
+        return '+'.join(parts)
+    except (KeyError, TypeError):
+        # Fallback to default if config is malformed
+        return 'Ctrl+Shift+Esc'
 
 def check_exit_shortcut(event, config):
     """Check if the event matches the configured exit shortcut."""
-    shortcut = config['exit_shortcut']
-    
-    # Get the key constant from pygame
     try:
+        shortcut = config['exit_shortcut']
+        
+        # Get the key constant from pygame
         if hasattr(pygame, f"K_{shortcut['key']}"):
             expected_key = getattr(pygame, f"K_{shortcut['key']}")
         else:
             # Fallback to default ESC if key is invalid
             expected_key = pygame.K_ESCAPE
-    except:
+    except (KeyError, TypeError, AttributeError):
+        # Fallback to default ESC if config is malformed
         expected_key = pygame.K_ESCAPE
     
     # Check if the key matches
     if event.key != expected_key:
         return False
     
-    # Get modifier states
-    mods = pygame.key.get_mods()
-    
-    # Check ctrl
-    ctrl_pressed = bool(mods & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
-    if shortcut.get('ctrl', False) != ctrl_pressed:
-        return False
-    
-    # Check shift
-    shift_pressed = bool(mods & (pygame.KMOD_SHIFT | pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
-    if shortcut.get('shift', False) != shift_pressed:
-        return False
-    
-    # Check alt
-    alt_pressed = bool(mods & (pygame.KMOD_ALT | pygame.KMOD_LALT | pygame.KMOD_RALT))
-    if shortcut.get('alt', False) != alt_pressed:
-        return False
-    
-    return True
+    try:
+        # Get modifier states
+        mods = pygame.key.get_mods()
+        
+        # Check ctrl
+        ctrl_pressed = bool(mods & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
+        if shortcut.get('ctrl', False) != ctrl_pressed:
+            return False
+        
+        # Check shift
+        shift_pressed = bool(mods & (pygame.KMOD_SHIFT | pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
+        if shortcut.get('shift', False) != shift_pressed:
+            return False
+        
+        # Check alt
+        alt_pressed = bool(mods & (pygame.KMOD_ALT | pygame.KMOD_LALT | pygame.KMOD_RALT))
+        if shortcut.get('alt', False) != alt_pressed:
+            return False
+        
+        return True
+    except (KeyError, TypeError):
+        # If we can't get modifiers from config, just check the key
+        return event.key == expected_key
 
 # Load configuration
 config = load_config()
