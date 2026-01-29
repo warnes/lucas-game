@@ -81,8 +81,9 @@ python random_color_screen.py
 ### Configuration
 
 The exit shortcut can be customized by editing the configuration file located at:
-- **Linux/macOS**: `~/.lucas-game/config.json`
-- **Windows**: `C:\Users\<username>\.lucas-game\config.json`
+- **Linux/Unix**: `~/.config/lucas-game/config.json` (or `$XDG_CONFIG_HOME/lucas-game/config.json`)
+- **macOS**: `~/Library/Application Support/lucas-game/config.json`
+- **Windows**: `%APPDATA%\lucas-game\config.json` (typically `C:\Users\<username>\AppData\Roaming\lucas-game\config.json`)
 
 Example configuration:
 ```json
