@@ -416,6 +416,9 @@ def main():
         pygame.quit()
         return
     
+    # Hide mouse cursor during gameplay to reduce distractions and discourage trackpad use
+    pygame.mouse.set_visible(False)
+    
     running = True
     
     # Use the title screen key press for the first action
@@ -460,6 +463,11 @@ def main():
                     play_random_tone()
                     # Clear any keystrokes that happened during tone playback
                     pygame.event.clear(pygame.KEYDOWN)
+            elif event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION, pygame.MOUSEWHEEL):
+                # Capture mouse/trackpad events to prevent them from propagating
+                # Note: This does not prevent macOS system gestures (Mission Control, etc.)
+                # which operate at the OS level. See TRACKPAD_SWIPE_RESEARCH.md for details.
+                pass
         
         clock.tick(60)  # 60 FPS
     
