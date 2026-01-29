@@ -10,7 +10,6 @@ License: MIT
 import pygame
 import random
 import sys
-import os
 import json
 from pathlib import Path
 
@@ -65,6 +64,7 @@ def load_config():
                     shortcut = config['exit_shortcut']
                     # Check that all required fields exist and have correct types
                     if (isinstance(shortcut.get('key'), str) and
+                        len(shortcut.get('key', '')) > 0 and
                         isinstance(shortcut.get('ctrl'), bool) and
                         isinstance(shortcut.get('shift'), bool) and
                         isinstance(shortcut.get('alt'), bool)):
@@ -132,17 +132,17 @@ def check_exit_shortcut(event, config):
         mods = pygame.key.get_mods()
         
         # Check ctrl
-        ctrl_pressed = bool(mods & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
+        ctrl_pressed = bool(mods & pygame.KMOD_CTRL)
         if shortcut.get('ctrl', False) != ctrl_pressed:
             return False
         
         # Check shift
-        shift_pressed = bool(mods & (pygame.KMOD_SHIFT | pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
+        shift_pressed = bool(mods & pygame.KMOD_SHIFT)
         if shortcut.get('shift', False) != shift_pressed:
             return False
         
         # Check alt
-        alt_pressed = bool(mods & (pygame.KMOD_ALT | pygame.KMOD_LALT | pygame.KMOD_RALT))
+        alt_pressed = bool(mods & pygame.KMOD_ALT)
         if shortcut.get('alt', False) != alt_pressed:
             return False
         
@@ -327,6 +327,41 @@ def draw_key(screen, key_name, color, text_color=(255, 255, 255)):
     
     screen.blit(text_surface, (text_x, text_y))
 
+def draw_exit_hint(screen, config):
+    """Draw a small hint in the corner showing the exit shortcut."""
+    screen_width, screen_height = screen.get_size()
+    
+    # Create semi-transparent background for better readability
+    hint_font = pygame.font.Font(None, 28)
+    exit_shortcut = get_exit_shortcut_display(config)
+    hint_text = f"Exit: {exit_shortcut}"
+    
+    # Render text
+    text_surface = hint_font.render(hint_text, True, (255, 255, 255))
+    
+    # Calculate position (bottom-right corner with padding)
+    padding = 15
+    text_x = screen_width - text_surface.get_width() - padding
+    text_y = screen_height - text_surface.get_height() - padding
+    
+    # Draw semi-transparent background
+    bg_padding = 8
+    bg_rect = pygame.Rect(
+        text_x - bg_padding,
+        text_y - bg_padding,
+        text_surface.get_width() + bg_padding * 2,
+        text_surface.get_height() + bg_padding * 2
+    )
+    
+    # Create a surface for the background with alpha
+    bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+    bg_surface.set_alpha(128)  # 50% transparency
+    bg_surface.fill((0, 0, 0))
+    screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+    
+    # Draw text
+    screen.blit(text_surface, (text_x, text_y))
+
 def generate_tone(frequency, duration=0.2, sample_rate=22050):
     """Generate a tone with the given frequency and duration."""
     if not SOUND_AVAILABLE:
@@ -387,6 +422,7 @@ def main():
     screen.fill(current_color)
     key_name = get_key_name(start_event.key)
     draw_key(screen, key_name, current_color)
+    draw_exit_hint(screen, config)
     pygame.display.flip()
     
     exit_shortcut = get_exit_shortcut_display(config)
@@ -415,6 +451,9 @@ def main():
                     # Get the key name and draw it
                     key_name = get_key_name(event.key)
                     draw_key(screen, key_name, current_color)
+                    
+                    # Draw exit hint in corner
+                    draw_exit_hint(screen, config)
                     
                     pygame.display.flip()
                     play_random_tone()

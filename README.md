@@ -76,6 +76,8 @@ python random_color_screen.py
 - **Any key**: Change color and play a random tone
 - **Ctrl+Shift+Esc**: Exit the game (default, configurable)
 
+**Note**: A small hint showing the exit shortcut is displayed in the bottom-right corner of the screen while the game is running, so parents can easily see how to exit.
+
 ### Configuration
 
 The exit shortcut can be customized by editing the configuration file located at:
