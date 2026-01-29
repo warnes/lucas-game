@@ -74,7 +74,36 @@ python random_color_screen.py
 ### Controls
 
 - **Any key**: Change color and play a random tone
-- **ESC**: Exit the game
+- **Ctrl+Shift+Esc**: Exit the game (default, configurable)
+
+**Note**: A small hint showing the exit shortcut is displayed in the bottom-right corner of the screen while the game is running, so parents can easily see how to exit.
+
+### Configuration
+
+The exit shortcut can be customized by editing the configuration file located at:
+- **Linux/Unix**: `~/.config/lucas-game/config.json` (or `$XDG_CONFIG_HOME/lucas-game/config.json`)
+- **macOS**: `~/Library/Application Support/lucas-game/config.json`
+- **Windows**: `%APPDATA%\lucas-game\config.json` (typically `C:\Users\<username>\AppData\Roaming\lucas-game\config.json`)
+
+Example configuration:
+```json
+{
+    "exit_shortcut": {
+        "key": "ESCAPE",
+        "ctrl": true,
+        "shift": true,
+        "alt": false
+    }
+}
+```
+
+The `key` field should be a pygame key constant name **without** the `K_` prefix:
+- **Correct**: `"ESCAPE"`, `"Q"`, `"F10"`, `"RETURN"`
+- **Incorrect**: `"K_ESCAPE"`, `"K_Q"`, `"esc"` (case-sensitive)
+
+The modifier keys (`ctrl`, `shift`, `alt`) can be set to `true` or `false`.
+
+The configuration file is automatically created with default values on first run. The default exit shortcut (Ctrl+Shift+Esc) is designed to be difficult for children to accidentally press.
 
 ## How It Works
 
