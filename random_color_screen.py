@@ -11,9 +11,8 @@ import pygame
 import random
 import sys
 import json
-import os
-import platform
 from pathlib import Path
+from platformdirs import user_config_dir
 
 # Initialize Pygame
 pygame.init()
@@ -41,27 +40,8 @@ pygame.display.set_caption("Random Color Screen")
 # Get screen dimensions
 width, height = screen.get_size()
 
-# Configuration file path (OS-appropriate location)
-def get_config_dir():
-    """Get the OS-appropriate configuration directory."""
-    system = platform.system()
-    
-    if system == 'Windows':
-        # Windows: Use APPDATA or LOCALAPPDATA
-        appdata = Path(os.environ.get('APPDATA', Path.home() / 'AppData' / 'Roaming'))
-        return appdata / 'lucas-game'
-    elif system == 'Darwin':
-        # macOS: Use Application Support
-        return Path.home() / 'Library' / 'Application Support' / 'lucas-game'
-    else:
-        # Linux/Unix: Use XDG_CONFIG_HOME or ~/.config
-        xdg_config = os.environ.get('XDG_CONFIG_HOME')
-        if xdg_config:
-            return Path(xdg_config) / 'lucas-game'
-        else:
-            return Path.home() / '.config' / 'lucas-game'
-
-CONFIG_DIR = get_config_dir()
+# Configuration file path (OS-appropriate location using platformdirs)
+CONFIG_DIR = Path(user_config_dir("lucas-game", "warnes"))
 CONFIG_FILE = CONFIG_DIR / 'config.json'
 
 # Default configuration
