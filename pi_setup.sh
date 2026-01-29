@@ -68,7 +68,7 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
     
     # Loop to restart game if it crashes (but not if ESC was pressed)
     while true; do
-        python random_color_screen.py
+        python lucas_game.py
         EXIT_CODE=$?
         
         # Exit code 0 means normal exit (ESC pressed), don't restart
@@ -102,14 +102,14 @@ echo "Setup Complete!"
 echo "=========================================="
 echo ""
 echo "Next steps:"
-echo "1. Make sure random_color_screen.py is in ~/lucas_game/"
+echo "1. Make sure lucas_game.py is in ~/lucas_game/"
 echo "2. Reboot the Pi: sudo reboot"
 echo "3. The game should start automatically after boot"
 echo ""
 echo "To manually test before rebooting:"
 echo "  cd ~/lucas_game"
 echo "  source venv/bin/activate"
-echo "  python random_color_screen.py"
+echo "  python lucas_game.py"
 echo ""
 echo "Press ESC to exit the game"
 echo ""

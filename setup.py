@@ -5,7 +5,7 @@ Copyright (c) 2025 Gregory R. Warnes
 
 from setuptools import setup
 
-APP = ['random_color_screen.py']
+APP = ['lucas_game.py']
 DATA_FILES = []
 OPTIONS = {
     'argv_emulation': False,
@@ -19,7 +19,7 @@ OPTIONS = {
         'NSHumanReadableCopyright': '© 2025 Gregory R. Warnes',
         'NSHighResolutionCapable': True,
     },
-    'packages': ['pygame', 'numpy', 'sounddevice'],
+    'packages': ['pygame', 'numpy', 'sounddevice', 'platformdirs'],
 }
 
 setup(
