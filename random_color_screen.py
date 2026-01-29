@@ -10,6 +10,9 @@ License: MIT
 import pygame
 import random
 import sys
+import os
+import json
+from pathlib import Path
 
 # Initialize Pygame
 pygame.init()
@@ -26,7 +29,7 @@ try:
     import numpy as np
     import sounddevice as sd
     SOUND_AVAILABLE = True
-except (ImportError, NotImplementedError) as e:
+except (ImportError, NotImplementedError, OSError) as e:
     print(f"Sound not available: {e}")
     print("Continuing without sound support.")
 
@@ -37,11 +40,108 @@ pygame.display.set_caption("Random Color Screen")
 # Get screen dimensions
 width, height = screen.get_size()
 
+# Configuration file path (in user's home directory)
+CONFIG_DIR = Path.home() / '.lucas-game'
+CONFIG_FILE = CONFIG_DIR / 'config.json'
+
+# Default configuration
+DEFAULT_CONFIG = {
+    'exit_shortcut': {
+        'key': 'ESCAPE',
+        'ctrl': True,
+        'shift': True,
+        'alt': False
+    }
+}
+
+def load_config():
+    """Load configuration from file or create default config."""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                # Validate required keys
+                if 'exit_shortcut' in config:
+                    return config
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Error loading config file: {e}")
+    
+    # Create default config
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(DEFAULT_CONFIG, f, indent=4)
+        print(f"Created default config file at: {CONFIG_FILE}")
+    except IOError as e:
+        print(f"Warning: Could not create config file: {e}")
+    
+    return DEFAULT_CONFIG
+
+def get_exit_shortcut_display(config):
+    """Get a human-readable display string for the exit shortcut."""
+    shortcut = config['exit_shortcut']
+    parts = []
+    
+    if shortcut.get('ctrl', False):
+        parts.append('Ctrl')
+    if shortcut.get('shift', False):
+        parts.append('Shift')
+    if shortcut.get('alt', False):
+        parts.append('Alt')
+    
+    # Map key names to display names
+    key = shortcut['key']
+    key_display = key.title() if key != 'ESCAPE' else 'Esc'
+    parts.append(key_display)
+    
+    return '+'.join(parts)
+
+def check_exit_shortcut(event, config):
+    """Check if the event matches the configured exit shortcut."""
+    shortcut = config['exit_shortcut']
+    
+    # Get the key constant from pygame
+    try:
+        if hasattr(pygame, f"K_{shortcut['key']}"):
+            expected_key = getattr(pygame, f"K_{shortcut['key']}")
+        else:
+            # Fallback to default ESC if key is invalid
+            expected_key = pygame.K_ESCAPE
+    except:
+        expected_key = pygame.K_ESCAPE
+    
+    # Check if the key matches
+    if event.key != expected_key:
+        return False
+    
+    # Get modifier states
+    mods = pygame.key.get_mods()
+    
+    # Check ctrl
+    ctrl_pressed = bool(mods & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
+    if shortcut.get('ctrl', False) != ctrl_pressed:
+        return False
+    
+    # Check shift
+    shift_pressed = bool(mods & (pygame.KMOD_SHIFT | pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
+    if shortcut.get('shift', False) != shift_pressed:
+        return False
+    
+    # Check alt
+    alt_pressed = bool(mods & (pygame.KMOD_ALT | pygame.KMOD_LALT | pygame.KMOD_RALT))
+    if shortcut.get('alt', False) != alt_pressed:
+        return False
+    
+    return True
+
+# Load configuration
+config = load_config()
+
 def generate_random_color():
     """Generate a random RGB color."""
     return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
-def show_title_screen(screen):
+def show_title_screen(screen, config):
     """Display title screen and instructions."""
     screen_width, screen_height = screen.get_size()
     screen.fill((20, 20, 40))  # Dark blue background
@@ -55,11 +155,12 @@ def show_title_screen(screen):
     
     # Instructions
     instruction_font = pygame.font.Font(None, 48)
+    exit_shortcut = get_exit_shortcut_display(config)
     instructions = [
         "Press any key to see it displayed",
         "with a random color and sound!",
         "",
-        "Press ESC to exit",
+        f"Press {exit_shortcut} to exit",
         "",
         "Press any key to start..."
     ]
@@ -87,7 +188,7 @@ def show_title_screen(screen):
             if event.type == pygame.QUIT:
                 return None
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if check_exit_shortcut(event, config):
                     return None
                 return event  # Return the key event
     return None
@@ -257,7 +358,7 @@ def main():
     clock = pygame.time.Clock()
     
     # Show title screen and get the starting key event
-    start_event = show_title_screen(screen)
+    start_event = show_title_screen(screen, config)
     if start_event is None:
         pygame.quit()
         return
@@ -271,9 +372,10 @@ def main():
     draw_key(screen, key_name, current_color)
     pygame.display.flip()
     
+    exit_shortcut = get_exit_shortcut_display(config)
     print("Random Color Screen")
     print("Press any key to change color and play a tone")
-    print("Press ESC to exit")
+    print(f"Press {exit_shortcut} to exit")
     if not SOUND_AVAILABLE:
         print("\nNote: Sound is not available on this system")
         print("Visual feedback (♪) will be shown instead")
@@ -286,7 +388,7 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if check_exit_shortcut(event, config):
                     running = False
                 else:
                     # Change color and play tone
