@@ -76,6 +76,43 @@ python random_color_screen.py
 - **Any key**: Change color and play a random tone
 - **ESC**: Exit the game
 
+### Preventing Accidental Trackpad Swipes (macOS)
+
+On macOS, children may accidentally swipe on the trackpad, which can trigger Mission Control or switch between virtual desktops. To prevent this issue:
+
+#### Option 1: Disable System Gestures (Recommended for Parents)
+
+**Using System Preferences:**
+1. Open **System Preferences** → **Trackpad**
+2. Click on the **More Gestures** tab
+3. Uncheck "**Swipe between full-screen apps**" (3-finger horizontal swipe)
+4. Optionally uncheck "**Mission Control**" (3-finger swipe up)
+
+**Using Terminal (Advanced):**
+```bash
+# Disable swipe between full-screen apps
+defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerHorizSwipeGesture -int 0
+
+# Disable Mission Control gesture
+defaults write com.apple.dock showMissionControlGestureEnabled -bool false
+
+# Restart Dock to apply changes
+killall Dock
+```
+
+To re-enable these features later, either use System Preferences or run:
+```bash
+defaults delete com.apple.AppleMultitouchTrackpad TrackpadThreeFingerHorizSwipeGesture
+defaults delete com.apple.dock showMissionControlGestureEnabled
+killall Dock
+```
+
+#### Option 2: Use External Keyboard
+
+For the best experience, use an external keyboard with the trackpad disabled or covered.
+
+**Note**: The game automatically hides the mouse cursor and captures mouse events, but macOS system gestures operate at the OS level and cannot be prevented by the application itself. See `TRACKPAD_SWIPE_RESEARCH.md` for detailed technical information.
+
 ## How It Works
 
 The game uses pygame for graphics and event handling, and sounddevice for audio generation. Each keypress triggers a random color fill and plays a musical note from the C major scale with a 1-second duration.
