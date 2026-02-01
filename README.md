@@ -63,12 +63,12 @@ pip install pygame numpy sounddevice
 
 Run the game:
 ```bash
-./random_color_screen.py
+./lucas_game.py
 ```
 
 Or:
 ```bash
-python random_color_screen.py
+python lucas_game.py
 ```
 
 ### Controls

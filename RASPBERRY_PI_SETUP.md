@@ -97,7 +97,7 @@ If you want the Pi to create its own WiFi network (so you can connect directly w
 
 2. Copy the game files:
    ```bash
-   scp -r random_color_screen.py requirements.txt pi@raspberrypi.local:~/lucas_game/
+   scp -r lucas_game.py requirements.txt pi@raspberrypi.local:~/lucas_game/
    ```
 
 3. SSH back into the Pi and run the setup script:
@@ -131,7 +131,7 @@ If you need to manually configure auto-start:
    if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
        cd ~/lucas_game
        source venv/bin/activate
-       python random_color_screen.py
+       python lucas_game.py
    fi
    ```
 
@@ -165,7 +165,7 @@ If you need to manually configure auto-start:
   ```bash
   cd ~/lucas_game
   source venv/bin/activate
-  python random_color_screen.py
+  python lucas_game.py
   ```
 
 ### Need to exit to shell
@@ -298,7 +298,7 @@ Build a completely pre-configured image on your Mac. **No internet required on t
    if [ -z "\$DISPLAY" ] && [ "\$(tty)" = "/dev/tty1" ]; then
        cd ~/lucas_game
        source venv/bin/activate
-       python random_color_screen.py
+       python lucas_game.py
    fi' >> /home/pi/.bashrc
    
    # Enable auto-login
@@ -388,7 +388,7 @@ Build a completely pre-configured image on your Mac. **No internet required on t
          "sudo -u pi python3 -m venv venv",
          "sudo -u pi venv/bin/pip install numpy sounddevice",
          "sudo -u pi venv/bin/pip install pygame --no-binary :all:",
-         "echo 'if [ -z \"$DISPLAY\" ] && [ \"$(tty)\" = \"/dev/tty1\" ]; then cd ~/lucas_game; source venv/bin/activate; python random_color_screen.py; fi' >> /home/pi/.bashrc",
+         "echo 'if [ -z \"$DISPLAY\" ] && [ \"$(tty)\" = \"/dev/tty1\" ]; then cd ~/lucas_game; source venv/bin/activate; python lucas_game.py; fi' >> /home/pi/.bashrc",
          "systemctl enable getty@tty1",
          "mkdir -p /etc/systemd/system/getty@tty1.service.d",
          "echo -e '[Service]\\nExecStart=\\nExecStart=-/sbin/agetty --autologin pi --noclear %I $TERM' > /etc/systemd/system/getty@tty1.service.d/autologin.conf"

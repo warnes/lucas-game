@@ -35,14 +35,18 @@ border_radius = key_height // 6
 # Draw shadow
 shadow_offset = 15
 shadow_color = (50, 50, 50, 180)
-shadow_rect = pygame.Rect(key_x + shadow_offset, key_y + shadow_offset, key_width, key_height)
+shadow_rect = pygame.Rect(
+    key_x + shadow_offset, key_y + shadow_offset, key_width, key_height
+)
 pygame.draw.rect(surface, shadow_color, shadow_rect, border_radius=border_radius)
 
 # Draw key body (white)
 pygame.draw.rect(surface, (255, 255, 255, 255), key_rect, border_radius=border_radius)
 
 # Draw key border
-pygame.draw.rect(surface, (100, 100, 100, 255), key_rect, width=8, border_radius=border_radius)
+pygame.draw.rect(
+    surface, (100, 100, 100, 255), key_rect, width=8, border_radius=border_radius
+)
 
 # Draw text "L" on the key
 font_size = int(key_height * 0.6)
