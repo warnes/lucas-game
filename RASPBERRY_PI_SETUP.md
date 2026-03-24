@@ -95,9 +95,10 @@ If you want the Pi to create its own WiFi network (so you can connect directly w
    scp pi_setup.sh pi@raspberrypi.local:~/
    ```
 
-2. Copy the game files:
+2. Create the target directory and copy the game file:
    ```bash
-   scp -r lucas_game.py requirements.txt pi@raspberrypi.local:~/lucas_game/
+   ssh pi@raspberrypi.local 'mkdir -p ~/lucas_game'
+   scp lucas_game.py pi@raspberrypi.local:~/lucas_game/
    ```
 
 3. SSH back into the Pi and run the setup script:
@@ -114,7 +115,7 @@ The setup script will configure the game to start automatically on boot. The Pi 
 1. Boot to console
 2. Auto-login as the `pi` user
 3. Automatically start Lucas' Game in fullscreen
-4. Restart the game if it exits (unless ESC is pressed)
+4. Restart the game if it exits unexpectedly (unless Ctrl+Shift+Esc is pressed)
 
 ## Manual Configuration (if needed)
 
@@ -127,11 +128,25 @@ If you need to manually configure auto-start:
 
 2. Add at the end:
    ```bash
-   # Auto-start Lucas' Game on console login
+   # Auto-start Lucas' Game on console login (tty1 only)
    if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+       echo "Starting Lucas' Game..."
        cd ~/lucas_game
        source venv/bin/activate
-       python lucas_game.py
+
+       # Loop to restart game if it crashes (but not if Ctrl+Shift+Esc was pressed)
+       while true; do
+           python lucas_game.py
+           EXIT_CODE=$?
+
+           # Exit code 0 means normal exit (Ctrl+Shift+Esc pressed), don't restart
+           if [ $EXIT_CODE -eq 0 ]; then
+               break
+           fi
+
+           echo "Game crashed with exit code $EXIT_CODE, restarting in 3 seconds..."
+           sleep 3
+       done
    fi
    ```
 
@@ -168,8 +183,27 @@ If you need to manually configure auto-start:
   python lucas_game.py
   ```
 
+### Customizing the exit shortcut
+- The default exit shortcut is `Ctrl+Shift+Esc`.
+- The Linux config file is stored at:
+   ```bash
+   ~/.config/lucas-game/config.json
+   ```
+- Example configuration to use plain `Esc` instead:
+   ```json
+   {
+    "exit_shortcut": {
+        "key": "ESCAPE",
+        "ctrl": false,
+        "shift": false,
+        "alt": false
+    }
+   }
+   ```
+- Restart the game after editing the config.
+
 ### Need to exit to shell
-- Press ESC to exit the game
+- Press Ctrl+Shift+Esc to exit the game
 - To prevent auto-restart, comment out the auto-start line in `~/.bashrc`
 
 ## Accessing the Pi After Setup
@@ -179,12 +213,12 @@ If you need to manually configure auto-start:
    ssh pi@raspberrypi.local
    ```
 
-2. Or connect a keyboard and press ESC to exit the game
+2. Or connect a keyboard and press Ctrl+Shift+Esc to exit the game
 
 ## Updating the Game
 
 1. SSH into the Pi
-2. Stop the game (ESC or Ctrl+C)
+2. Stop the game with Ctrl+Shift+Esc or Ctrl+C
 3. Update files:
    ```bash
    cd ~/lucas_game

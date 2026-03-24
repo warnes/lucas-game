@@ -1,0 +1,22 @@
+# Cline Rules for lucas_game
+# Auto-loaded by Cline at the start of every task.
+
+## MANDATORY: Read project instructions first
+
+At the start of every task, read `.github/copilot-instructions.md` in full.
+
+## Available Skills
+
+User-level shared skills live in `/Users/warnes/src/vscode-config/.github/skills/`.
+
+To read a skill: `read_file` on `SKILL.md` inside the relevant directory.
+
+## Available Slash Command Prompts
+
+Prompt files live in `/Users/warnes/src/vscode-config/prompts/`.
+When the user invokes a slash command, read the corresponding `.prompt.md` file.
+
+## MCP Tools available in Cline
+
+- **obo-mcp**: `obo_create`, `obo_list_items`, `obo_mark_complete`, `obo_update_field`
+- **markitdown**: Convert documents/URLs to Markdown for reading.

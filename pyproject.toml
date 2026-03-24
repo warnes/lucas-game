@@ -4,16 +4,29 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lucas-game"
-version = "1.0.0"
-description = "Interactive color and sound keyboard game"
+version = "1.1.0"
+description = "Fullscreen keyboard game with configurable exit shortcut and optional audio"
 authors = [{name = "Gregory R. Warnes", email = "greg@warnes.net"}]
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.7"
+dependencies = [
+	"pygame",
+	"platformdirs",
+]
+
+[project.optional-dependencies]
+audio = [
+	"numpy",
+	"sounddevice",
+]
 
 [project.urls]
 Homepage = "https://github.com/warnes/lucas-game"
 Repository = "https://github.com/warnes/lucas-game"
 
 [project.scripts]
-lucas-game = "random_color_screen:main"
+lucas-game = "lucas_game:main"
+
+[tool.setuptools]
+py-modules = ["lucas_game"]

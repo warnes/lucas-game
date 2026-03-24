@@ -33,3 +33,7 @@ dist/
 *.icns
 *.iconset/
 icon.png
+
+# Node / web
+node_modules/
+web/dist/

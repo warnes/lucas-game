@@ -1,0 +1,88 @@
+/* ─── Reset & base ─────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: sans-serif;
+}
+
+/* ─── Title screen ──────────────────────────────────────────────── */
+#title-screen {
+  width:            100vw;
+  height:           100vh;
+  background-color: #141428;
+  display:          flex;
+  flex-direction:   column;
+  align-items:      center;
+  justify-content:  center;
+  gap:              0;
+  cursor:           pointer;
+  user-select:      none;
+}
+
+#title {
+  color:       #ffc832;
+  font-size:   clamp(2rem, 8vw, 7rem);
+  font-weight: bold;
+  margin-bottom: 2.5rem;
+  text-align:  center;
+}
+
+#instructions {
+  color:      #c8c8c8;
+  font-size:  clamp(1rem, 2.5vw, 2rem);
+  text-align: center;
+  line-height: 1.8;
+}
+
+#copyright {
+  position:  absolute;
+  bottom:    1.2rem;
+  color:     #969696;
+  font-size: clamp(0.7rem, 1.2vw, 1rem);
+}
+
+/* ─── Game screen ───────────────────────────────────────────────── */
+#game-screen {
+  width:           100vw;
+  height:          100vh;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+}
+
+/* Key shape: 75 % of the viewport in each dimension */
+#key-wrapper {
+  width:           75vw;
+  height:          75vh;
+  border-radius:   min(7.5vw, 7.5vh);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  /* box-shadow set dynamically in JS to match current color */
+}
+
+/* Waiting hint shown when game screen first appears (click start, no key yet) */
+#waiting-hint {
+  position:  absolute;
+  color:     #c8c8c8;
+  font-size: clamp(1.2rem, 3vw, 2.5rem);
+}
+
+/* Key label: auto-scaled text, white, centered */
+#key-label {
+  color:       #ffffff;
+  font-weight: bold;
+  white-space: nowrap;
+  /* font-size set dynamically in JS */
+  line-height: 1;
+}

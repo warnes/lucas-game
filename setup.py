@@ -14,8 +14,8 @@ OPTIONS = {
         "CFBundleName": "Lucas' Game",
         "CFBundleDisplayName": "Lucas' Game",
         "CFBundleIdentifier": "com.gregorywarnes.lucasgame",
-        "CFBundleVersion": "1.0.0",
-        "CFBundleShortVersionString": "1.0.0",
+        "CFBundleVersion": "1.1.0",
+        "CFBundleShortVersionString": "1.1.0",
         "NSHumanReadableCopyright": "© 2025 Gregory R. Warnes",
         "NSHighResolutionCapable": True,
     },
@@ -24,12 +24,15 @@ OPTIONS = {
 
 setup(
     name="Lucas' Game",
-    version="1.0.0",
+    version="1.1.0",
     author="Gregory R. Warnes",
-    description="Interactive color and sound keyboard game",
+    description="Fullscreen keyboard game with configurable exit shortcut and optional audio",
     license="MIT",
     app=APP,
+    py_modules=["lucas_game"],
     data_files=DATA_FILES,
+    install_requires=["pygame", "platformdirs"],
+    extras_require={"audio": ["numpy", "sounddevice"]},
     options={"py2app": OPTIONS},
     setup_requires=["py2app"],
 )

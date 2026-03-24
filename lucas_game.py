@@ -1,7 +1,7 @@
 #!/Users/warnes/src/lucas_game/venv/bin/python
 """
-Random Color Screen with Sound
-Fills the screen with a random color and plays a random tone when any key is pressed.
+Lucas' Game - interactive color and sound keyboard game for children.
+Shows a fullscreen title screen, displays pressed keys, and supports a configurable exit shortcut.
 
 Copyright (c) 2025 Gregory R. Warnes
 License: MIT

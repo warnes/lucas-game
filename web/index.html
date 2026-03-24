@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lucas' Game</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Title screen -->
+    <div id="title-screen">
+      <h1 id="title">Lucas' Game</h1>
+      <div id="instructions">
+        <p>Press any key to see it displayed</p>
+        <p>with a random color and sound!</p>
+        <p>&nbsp;</p>
+        <p>Press any key or click to start&hellip;</p>
+      </div>
+      <div id="copyright">&#169; 2025 Gregory R. Warnes</div>
+    </div>
+
+    <!-- Game screen -->
+    <div id="game-screen" style="display:none">
+      <p id="waiting-hint">Press any key&hellip;</p>
+      <div id="key-wrapper">
+        <div id="key-label"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

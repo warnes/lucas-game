@@ -46,9 +46,9 @@ pip install --upgrade pip
 # Install Python dependencies
 echo ""
 echo "Step 5: Installing Python packages..."
-pip install numpy sounddevice
+pip install numpy sounddevice platformdirs
 
-# Build pygame from source for better compatibility
+# Build pygame from source for better SDL2 compatibility on kiosk systems
 echo ""
 echo "Step 6: Building pygame (this may take a while)..."
 pip install pygame --no-binary :all:
@@ -66,12 +66,12 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
     cd ~/lucas_game
     source venv/bin/activate
     
-    # Loop to restart game if it crashes (but not if ESC was pressed)
+    # Loop to restart game if it crashes (but not if Ctrl+Shift+Esc was pressed)
     while true; do
         python lucas_game.py
         EXIT_CODE=$?
         
-        # Exit code 0 means normal exit (ESC pressed), don't restart
+        # Exit code 0 means normal exit (Ctrl+Shift+Esc pressed), don't restart
         if [ $EXIT_CODE -eq 0 ]; then
             break
         fi
@@ -111,5 +111,5 @@ echo "  cd ~/lucas_game"
 echo "  source venv/bin/activate"
 echo "  python lucas_game.py"
 echo ""
-echo "Press ESC to exit the game"
+echo "Press Ctrl+Shift+Esc to exit the game"
 echo ""
