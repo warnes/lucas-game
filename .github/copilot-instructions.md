@@ -67,7 +67,7 @@ README.md:          ./lucas_game.py           # Usage section
 }
 ```
 
-**Key validation** (`lucas_game.py:59-90`): Config loader validates types. Invalid config falls back to defaults, creating new config file.
+**Key validation** (`load_config()` in `lucas_game.py`): Config loader validates types. Invalid config falls back to defaults, creating new config file.
 
 ## Dependencies & Platform Quirks
 
@@ -92,6 +92,9 @@ except (ImportError, NotImplementedError, OSError) as e:
     # Continue without sound - visual-only mode
 ```
 **Why**: Headless systems (Docker, some Linux servers) lack audio devices. App must function without sound.
+
+### Sound Playback Blocks the Event Loop
+`play_random_tone()` calls `sd.wait()`, which **blocks the main thread for the full tone duration (1 second)**. To prevent key-press accumulation during that block, `pygame.event.clear(pygame.KEYDOWN)` is called immediately after. Any change to audio timing must account for this: adding async audio would require removing the `event.clear()` call or replacing it with smarter debouncing.
 
 ## Testing Workflows
 
@@ -118,6 +121,9 @@ python lucas_game.py
 
 ## Anti-Patterns & Common Errors
 
+❌ **DON'T** run `./lucas_game.py` directly—the shebang is hardcoded to a specific user's venv path  
+✅ **DO** use `python lucas_game.py` from the activated venv
+
 ❌ **DON'T** use `pip install pygame` on macOS without checking SDL2 support  
 ✅ **DO** build from source with SDL2 libraries installed
 
@@ -137,6 +143,7 @@ python lucas_game.py
 3. **Complex exit shortcut**: Ctrl+Shift+Esc prevents children from accidentally quitting
 4. **On-screen exit hint**: Semi-transparent corner hint for parents (`draw_exit_hint()`)
 5. **Raspberry Pi target**: Optimized for console framebuffer, no X11 overhead
+6. **Title-screen key event passthrough**: `show_title_screen()` returns the `KEYDOWN` event that dismissed it. `main()` uses that event directly as the first game action—no keypress is wasted. If you refactor either function, preserve this coupling or the first key after the title screen will be silently ignored.
 
 ## Version Management
 

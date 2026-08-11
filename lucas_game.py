@@ -7,6 +7,11 @@ Copyright (c) 2025 Gregory R. Warnes
 License: MIT
 """
 
+import atexit
+import platform
+import signal
+import subprocess
+
 import pygame
 import random
 import sys
@@ -33,6 +38,92 @@ try:
 except (ImportError, NotImplementedError, OSError) as e:
     print(f"Sound not available: {e}")
     print("Continuing without sound support.")
+
+# ---------------------------------------------------------------------------
+# Media key suppression (macOS / Touch Bar)
+# ---------------------------------------------------------------------------
+# On macOS, remap system media and brightness keys to F13 via hidutil so the
+# child cannot accidentally change volume, brightness, or media playback.
+# The Touch Bar emits the same HID events as physical media keys, so this
+# suppresses Smart Bar presses too.  On exit (normal, crash, or SIGTERM) the
+# original mappings are restored.
+
+# Consumer-page (0x0C) HID usage codes for keys to suppress.
+# Format: (usagePage << 32) | usage
+_MACOS_MEDIA_HID_SRCS = [
+    0xC0000006F,  # Display Brightness Increment
+    0xC00000070,  # Display Brightness Decrement
+    0xC000000B3,  # Fast Forward
+    0xC000000B4,  # Rewind
+    0xC000000B5,  # Scan Next Track
+    0xC000000B6,  # Scan Previous Track
+    0xC000000B7,  # Stop
+    0xC000000B8,  # Eject
+    0xC000000CD,  # Play/Pause
+    0xC000000E2,  # Mute
+    0xC000000E9,  # Volume Increment
+    0xC000000EA,  # Volume Decrement
+]
+# Destination: F13 on Keyboard page (0x07), usage 0x68.
+# F13 is ignored by the game's event loop, so the press becomes a no-op.
+_MACOS_MEDIA_HID_DST = 0x700000068
+
+
+def _suppress_media_keys():
+    """Remap system media/brightness keys to F13 via hidutil (macOS only)."""
+    if platform.system() != "Darwin":
+        return
+    mapping = json.dumps({
+        "UserKeyMapping": [
+            {
+                "HIDKeyboardModifierMappingSrc": src,
+                "HIDKeyboardModifierMappingDst": _MACOS_MEDIA_HID_DST,
+            }
+            for src in _MACOS_MEDIA_HID_SRCS
+        ]
+    })
+    try:
+        subprocess.run(
+            ["hidutil", "property", "--set", mapping],
+            check=True,
+            capture_output=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Warning: Could not suppress media keys: {e}")
+
+
+def _restore_media_keys():
+    """Restore default system media/brightness key handling (macOS only)."""
+    if platform.system() != "Darwin":
+        return
+    try:
+        subprocess.run(
+            ["hidutil", "property", "--set", '{"UserKeyMapping": []}'],
+            check=True,
+            capture_output=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Warning: Could not restore media keys: {e}")
+
+
+atexit.register(_restore_media_keys)
+
+
+def _sigterm_handler(signum, frame):
+    """Restore media keys and exit cleanly on SIGTERM."""
+    _restore_media_keys()
+    pygame.quit()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, _sigterm_handler)
+
+# Set of pygame key codes to silently ignore in the event loop.
+# Media keys are remapped to F13 by _suppress_media_keys(); swallowing them
+# here provides defense-in-depth and prevents spurious color/sound changes.
+_IGNORED_KEYS = frozenset({pygame.K_F13})
+
+# ---------------------------------------------------------------------------
 
 # Set up fullscreen display
 screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -214,6 +305,8 @@ def show_title_screen(screen, config):
             elif event.type == pygame.KEYDOWN:
                 if check_exit_shortcut(event, config):
                     return None
+                if event.key in _IGNORED_KEYS:
+                    continue  # Silently ignore remapped media keys
                 return event  # Return the key event
     return None
 
@@ -435,6 +528,7 @@ def play_random_tone():
 
 def main():
     """Main game loop."""
+    _suppress_media_keys()
     clock = pygame.time.Clock()
 
     # Show title screen and get the starting key event
@@ -471,6 +565,8 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if check_exit_shortcut(event, config):
                     running = False
+                elif event.key in _IGNORED_KEYS:
+                    pass  # Silently ignore remapped media keys
                 else:
                     # Change color and play tone
                     current_color = generate_random_color()
