@@ -43,8 +43,10 @@ setup(
     app=APP,
     py_modules=["lucas_game"],
     data_files=DATA_FILES,
-    install_requires=["pygame", "platformdirs"],
-    extras_require={"audio": ["numpy", "sounddevice"]},
+    # Runtime dependencies live in pyproject.toml ([project].dependencies and
+    # [project.optional-dependencies].audio).  They must NOT be repeated here:
+    # py2app rejects install_requires with "error: install_requires is no
+    # longer supported", which breaks build_macos.sh outright.
     options={"py2app": OPTIONS},
     setup_requires=["py2app"],
 )
