@@ -93,6 +93,20 @@ except (ImportError, NotImplementedError, OSError) as e:
 ```
 **Why**: Headless systems (Docker, some Linux servers) lack audio devices. App must function without sound.
 
+### py2app Must Not Zip `_sounddevice_data`
+**Problem**: The `.app` runs silently — sound works via `python lucas_game.py` but not when launched from the Dock.
+**Cause**: py2app zips pure-Python packages into `Resources/lib/python39.zip`. `sounddevice` locates
+`libportaudio.dylib` through `_sounddevice_data.__path__`, and `dlopen()` cannot read a dylib from inside a
+zip (`OSError ... errno=20`). That `OSError` is swallowed by the `SOUND_AVAILABLE` guard, so the app degrades
+to silent mode with no visible error — stderr goes nowhere when launched from the Dock.
+**Solution**: List `_sounddevice_data` (and `cffi`) in `OPTIONS["packages"]` in `setup.py`; py2app then copies
+them as real directory trees. Verify after building:
+```bash
+ls "dist/Lucas' Game.app/Contents/Resources/lib/python3.9/_sounddevice_data/portaudio-binaries/"
+```
+The title screen also displays the `SOUND_ERROR` text whenever sound fails, so this class of bug is visible
+without a console.
+
 ### Sound Playback Blocks the Event Loop
 `play_random_tone()` calls `sd.wait()`, which **blocks the main thread for the full tone duration (1 second)**. To prevent key-press accumulation during that block, `pygame.event.clear(pygame.KEYDOWN)` is called immediately after. Any change to audio timing must account for this: adding async audio would require removing the `event.clear()` call or replacing it with smarter debouncing.
 

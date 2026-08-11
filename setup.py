@@ -19,7 +19,19 @@ OPTIONS = {
         "NSHumanReadableCopyright": "© 2025 Gregory R. Warnes",
         "NSHighResolutionCapable": True,
     },
-    "packages": ["pygame", "numpy", "sounddevice", "platformdirs"],
+    # Listing a package here makes py2app copy it as a real directory tree
+    # instead of zipping it into python39.zip.  _sounddevice_data must be
+    # unzipped: sounddevice locates libportaudio.dylib via its __path__ and
+    # dlopen() cannot load a dylib from inside a zip archive.
+    "packages": [
+        "pygame",
+        "numpy",
+        "sounddevice",
+        "platformdirs",
+        "cffi",
+        "_sounddevice_data",
+    ],
+    "includes": ["_sounddevice", "_cffi_backend"],
 }
 
 setup(

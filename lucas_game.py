@@ -30,12 +30,16 @@ except Exception as e:
 
 # Try to initialize sound, but continue if not available
 SOUND_AVAILABLE = False
+SOUND_ERROR = ""
 try:
     import numpy as np
     import sounddevice as sd
 
     SOUND_AVAILABLE = True
 except (ImportError, NotImplementedError, OSError) as e:
+    # Recorded so the title screen can report it: when launched from the macOS
+    # Dock there is no console, so a stderr message alone is invisible.
+    SOUND_ERROR = str(e)
     print(f"Sound not available: {e}")
     print("Continuing without sound support.")
 
@@ -284,6 +288,14 @@ def show_title_screen(screen, config):
         x = (screen_width - text.get_width()) // 2
         screen.blit(text, (x, y_offset))
         y_offset += 60
+
+    # Warn on screen if sound failed to initialize
+    if not SOUND_AVAILABLE:
+        warning_font = pygame.font.Font(None, 32)
+        for line in ("Sound is not available:", SOUND_ERROR):
+            warning = warning_font.render(line, True, (255, 120, 120))
+            screen.blit(warning, ((screen_width - warning.get_width()) // 2, y_offset))
+            y_offset += 36
 
     # Copyright
     copyright_font = pygame.font.Font(None, 32)
