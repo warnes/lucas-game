@@ -10,10 +10,12 @@ A fullscreen keyboard game for young children. It starts on a title screen, then
 - Musical tone playback using random notes from the C major scale
 - Configurable exit shortcut with an on-screen corner hint
 - Visual-only fallback when audio libraries or audio devices are unavailable
+- On macOS, media and brightness keys (including the Touch Bar) are suppressed
+  while the game runs, and restored on exit
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.10+
 - pygame
 - platformdirs
 
@@ -21,6 +23,12 @@ Optional for audio support:
 
 - numpy
 - sounddevice
+
+**Note on the Python version**: `lucas_game.py` itself uses no syntax newer than
+Python 3.7, but current releases of its dependencies do have floors — as of
+this writing `platformdirs` 4.5.1 requires 3.10+ and `numpy` 2.4.1 requires
+3.11+. On an older interpreter pip will fall back to older dependency releases,
+which is untested. Python 3.11+ is recommended if you want audio.
 
 ## Installation
 
@@ -54,6 +62,12 @@ pip cache remove pygame  # Clear any cached wheels
 pip install pygame --no-binary :all:
 ```
 
+1. Install the game itself:
+
+```bash
+pip install .          # or: pip install -e .   for a development install
+```
+
 If `numpy` or `sounddevice` are unavailable, the game still runs in visual-only mode without audio.
 
 ### Linux/Windows
@@ -75,13 +89,28 @@ pip install pygame platformdirs numpy sounddevice
 
 For a visual-only install, `pygame` and `platformdirs` are sufficient.
 
+1. Install the game itself:
+
+```bash
+pip install .          # or: pip install -e .   for a development install
+```
+
 ## Usage
 
-Run the game:
+If you installed the package (`pip install .`), run it by name:
+
+```bash
+lucas-game
+```
+
+Otherwise run the script directly from the repository:
 
 ```bash
 python lucas_game.py
 ```
+
+**Note**: run `python lucas_game.py`, not `./lucas_game.py` — the shebang line
+points at a specific developer's virtual environment.
 
 ### Controls
 
@@ -114,10 +143,20 @@ Example configuration:
 
 The `key` field should be a pygame key constant name **without** the `K_` prefix:
 
-- **Correct**: `"ESCAPE"`, `"Q"`, `"F10"`, `"RETURN"`
-- **Incorrect**: `"K_ESCAPE"`, `"K_Q"`, `"esc"` (case-sensitive)
+- **Correct**: `"ESCAPE"`, `"Q"`, `"F10"`, `"RETURN"`, `"SPACE"`, `"1"`
+- **Incorrect**: `"K_ESCAPE"`, `"K_Q"` — the `K_` prefix must not be included
 
-The modifier keys (`ctrl`, `shift`, `alt`) can be set to `true` or `false`.
+Letter case is not significant: `"Q"` and `"q"` both work, as do `"ESCAPE"` and
+`"escape"`. (pygame itself spells letter constants in lowercase — `K_q` — and
+everything else in uppercase — `K_ESCAPE`, `K_F10`. The game accepts either.)
+
+If the key name cannot be resolved at all, the game prints a warning, falls back
+to `ESCAPE`, and the on-screen hint shows the shortcut that will actually exit
+rather than the one that was requested.
+
+The modifier keys (`ctrl`, `shift`, `alt`) can be set to `true` or `false`. A
+modifier set to `false` must be *absent* when the shortcut is pressed, so
+`Ctrl+Shift+Alt+Esc` will not trigger the default `Ctrl+Shift+Esc` shortcut.
 
 The configuration file is automatically created with default values on first run. If the file is missing, malformed, or has the wrong types, the game falls back to the default shortcut and rewrites the config. The default exit shortcut (Ctrl+Shift+Esc) is designed to be difficult for children to accidentally press.
 
@@ -132,6 +171,28 @@ The game uses `pygame` for fullscreen graphics and keyboard input, `platformdirs
 - plays a 1-second tone chosen from the C major scale when audio is available
 
 When audio is not available, the game continues to run and prints `♪` in the terminal as minimal feedback instead of playing sound.
+
+### Media key suppression (macOS)
+
+While the game is running on macOS it remaps the system media and brightness
+keys to F13 using `hidutil`, so a child cannot change the volume, screen
+brightness, or media playback. The Touch Bar emits the same HID events, so it is
+covered too. The original mappings are restored when the game exits — including
+on `SIGTERM` and on an unhandled crash.
+
+This changes system state only for the lifetime of the process. If the game is
+killed with `SIGKILL` (`kill -9`), the restore cannot run; run
+`hidutil property --set '{"UserKeyMapping":[]}'` to reset the mappings by hand.
+
+## Testing
+
+The test suite runs headlessly — it uses SDL's dummy video driver, so it will
+not take over your screen:
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
 
 ## Building macOS Application
 
@@ -158,8 +219,23 @@ The build script automatically:
 - Activates the virtual environment
 - Installs `py2app` if needed
 - Generates an application icon if one does not already exist
-- Recreates the `build/` and `dist/` directories
+- Removes `build/` and the previous `.app`, keeping the `dist/Applications`
+  symlink that makes the drag-and-drop install work
 - Creates a standalone `.app` bundle
+
+The bundle embeds its own Python interpreter and vendors `pygame`, `numpy`,
+`sounddevice` and `platformdirs`, so it runs on a Mac with no Python
+environment installed.
+
+Two things to know about the resulting `.app`:
+
+- **It is unsigned** (`codesign -dv` reports "code object is not signed at
+  all"), so Gatekeeper will refuse it on first launch — use right-click → Open,
+  or run `xattr -dr com.apple.quarantine "dist/Lucas' Game.app"`.
+- **It is built for the architecture of the build machine only**, not as a
+  universal binary. A bundle built on an Intel Mac needs Rosetta 2 to run on
+  Apple Silicon. Check with
+  `file "dist/Lucas' Game.app/Contents/MacOS/python"`.
 
 ## Web Version
 
