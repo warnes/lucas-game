@@ -181,6 +181,40 @@ def load_config():
     return DEFAULT_CONFIG
 
 
+_KEY_RESOLUTION_WARNED = set()
+
+
+def resolve_key_name(name):
+    """Resolve a config key name to a pygame key constant.
+
+    Returns ``(key_constant, resolved_name)``.  ``resolved_name`` is the
+    config spelling that actually worked, or ``None`` when the name could not
+    be resolved at all -- in which case the caller falls back to ESCAPE.
+
+    pygame's key constants are inconsistently cased: letters are lowercase
+    (``K_q``) while everything else is uppercase (``K_ESCAPE``, ``K_F10``,
+    ``K_RETURN``).  Accepting either case for letters keeps a natural-looking
+    ``"key": "Q"`` working instead of silently degrading to ESCAPE.
+    """
+    if not isinstance(name, str) or not name:
+        return pygame.K_ESCAPE, None
+
+    for candidate in (name, name.lower(), name.upper()):
+        key = getattr(pygame, f"K_{candidate}", None)
+        if isinstance(key, int):
+            return key, candidate
+
+    # Unresolvable: fall back to ESCAPE, but say so.  A silent fallback makes
+    # the on-screen hint disagree with the shortcut that actually exits.
+    if name not in _KEY_RESOLUTION_WARNED:
+        _KEY_RESOLUTION_WARNED.add(name)
+        print(
+            f"Warning: unknown exit-shortcut key {name!r}; falling back to ESCAPE. "
+            "Use a pygame key name without the 'K_' prefix (e.g. ESCAPE, Q, F10)."
+        )
+    return pygame.K_ESCAPE, None
+
+
 def get_exit_shortcut_display(config):
     """Get a human-readable display string for the exit shortcut."""
     try:
@@ -194,9 +228,12 @@ def get_exit_shortcut_display(config):
         if shortcut.get("alt", False):
             parts.append("Alt")
 
-        # Map key names to display names
-        key = shortcut["key"]
-        key_display = key.title() if key != "ESCAPE" else "Esc"
+        # Show the key that will ACTUALLY exit, not the one that was asked
+        # for: an unresolvable name falls back to ESCAPE, and a hint that
+        # advertises the wrong key is worse than no hint at all.
+        _, resolved = resolve_key_name(shortcut["key"])
+        key = resolved if resolved is not None else "ESCAPE"
+        key_display = "Esc" if key.upper() == "ESCAPE" else key.title()
         parts.append(key_display)
 
         return "+".join(parts)
@@ -207,15 +244,19 @@ def get_exit_shortcut_display(config):
 
 def check_exit_shortcut(event, config):
     """Check if the event matches the configured exit shortcut."""
+    # Bind up front: if the lookup below fails, the modifier checks further
+    # down still reference `shortcut`, and an unbound name raises NameError --
+    # which is NOT caught by their `except (KeyError, TypeError)`.
+    shortcut = DEFAULT_CONFIG["exit_shortcut"]
     try:
-        shortcut = config["exit_shortcut"]
+        candidate = config["exit_shortcut"]
+        # Keep `shortcut` a dict no matter what the config held, so the
+        # .get() calls below cannot raise AttributeError either.
+        if isinstance(candidate, dict):
+            shortcut = candidate
 
-        # Get the key constant from pygame
-        if hasattr(pygame, f"K_{shortcut['key']}"):
-            expected_key = getattr(pygame, f"K_{shortcut['key']}")
-        else:
-            # Fallback to default ESC if key is invalid
-            expected_key = pygame.K_ESCAPE
+        # Get the key constant from pygame (case-tolerant for letter keys)
+        expected_key, _ = resolve_key_name(shortcut["key"])
     except (KeyError, TypeError, AttributeError):
         # Fallback to default ESC if config is malformed
         expected_key = pygame.K_ESCAPE

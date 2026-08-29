@@ -36,8 +36,15 @@ if [ ! -f icon.icns ]; then
     echo "Icon created: icon.icns"
 fi
 
-# Clean previous builds
-rm -rf build dist
+# Clean previous builds.  Remove the bundle rather than the whole dist/
+# directory: dist/Applications is a tracked symlink to /Applications (it makes
+# the drag-and-drop install work), and "rm -rf dist" deletes it every build.
+rm -rf build
+rm -rf "dist/Lucas' Game.app"
+mkdir -p dist
+# -f -n so this is idempotent and also repairs a broken/stale link.  It will
+# fail rather than clobber if dist/Applications is somehow a real directory.
+ln -sfn /Applications dist/Applications
 
 # Build the application
 python setup.py py2app
