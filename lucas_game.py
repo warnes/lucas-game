@@ -8,15 +8,17 @@ License: MIT
 """
 
 import atexit
+import json
+import os
 import platform
+import random
+import shutil
 import signal
 import subprocess
+import sys
+from pathlib import Path
 
 import pygame
-import random
-import sys
-import json
-from pathlib import Path
 from platformdirs import user_config_dir
 
 # Initialize Pygame
@@ -49,8 +51,11 @@ except (ImportError, NotImplementedError, OSError) as e:
 # On macOS, remap system media and brightness keys to F13 via hidutil so the
 # child cannot accidentally change volume, brightness, or media playback.
 # The Touch Bar emits the same HID events as physical media keys, so this
-# suppresses Smart Bar presses too.  On exit (normal, crash, or SIGTERM) the
-# original mappings are restored.
+# suppresses Smart Bar presses too.  Our own suppression is undone on exit
+# (normal, crash, or SIGTERM).  Note this is NOT a save/restore: hidutil has one
+# system-wide mapping list and setting it replaces the whole thing, so we cannot
+# add to a user's existing mappings without losing them.  Rather than destroy
+# them, _suppress_media_keys() skips entirely when the user already has any.
 
 # Consumer-page (0x0C) HID usage codes for keys to suppress.
 # Format: (usagePage << 32) | usage
@@ -73,9 +78,44 @@ _MACOS_MEDIA_HID_SRCS = [
 _MACOS_MEDIA_HID_DST = 0x700000068
 
 
+# Set only after a suppression actually succeeds.  The restore path is a
+# system-wide mutation, so it must never run on the strength of "this module was
+# imported" -- see _restore_media_keys().
+_MEDIA_KEYS_SUPPRESSED = False
+
+
+def _user_has_existing_key_mappings():
+    """True if the user already has their own hidutil UserKeyMapping entries.
+
+    We replace the whole mapping array, so suppressing on top of someone's
+    Caps-Lock-to-Escape remap would destroy it with no way to put it back.
+    On any doubt (command missing, unreadable output) report True and skip
+    suppression: failing to protect the media keys is recoverable, silently
+    eating a user's keyboard configuration is not.
+    """
+    try:
+        result = subprocess.run(
+            ["hidutil", "property", "--get", "UserKeyMapping"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:  # noqa: BLE001 - fail safe, see docstring
+        return True
+    return "HIDKeyboardModifierMappingSrc" in result.stdout
+
+
 def _suppress_media_keys():
     """Remap system media/brightness keys to F13 via hidutil (macOS only)."""
+    global _MEDIA_KEYS_SUPPRESSED
     if platform.system() != "Darwin":
+        return
+    if _user_has_existing_key_mappings():
+        print(
+            "Note: you already have custom keyboard mappings (hidutil), so media "
+            "keys will NOT be suppressed -- overwriting them would destroy your "
+            "configuration with no way to restore it."
+        )
         return
     mapping = json.dumps(
         {
@@ -94,13 +134,27 @@ def _suppress_media_keys():
             check=True,
             capture_output=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        _MEDIA_KEYS_SUPPRESSED = True
+    except Exception as e:  # noqa: BLE001 - sibling of _restore_media_keys
+        # Broad for the same reason the restore path is: this is a convenience
+        # feature called on the way into the game, and no failure of it is worth
+        # taking the game down for.  The narrow (CalledProcessError,
+        # FileNotFoundError) pair missed PermissionError and every other OSError,
+        # any of which crashed the game at startup before the title screen.
         print(f"Warning: Could not suppress media keys: {e}")
 
 
 def _restore_media_keys():
-    """Restore default system media/brightness key handling (macOS only)."""
-    if platform.system() != "Darwin":
+    """Undo our own media-key suppression (macOS only).
+
+    Guarded on _MEDIA_KEYS_SUPPRESSED, and that guard is load-bearing: this
+    function is registered with atexit at module scope, so without it MERELY
+    IMPORTING this module -- which `pytest` does at collection -- would clear
+    the user's system-wide UserKeyMapping at interpreter exit, having never
+    started the game or set anything.
+    """
+    global _MEDIA_KEYS_SUPPRESSED
+    if not _MEDIA_KEYS_SUPPRESSED or platform.system() != "Darwin":
         return
     try:
         subprocess.run(
@@ -116,16 +170,25 @@ def _restore_media_keys():
         # restore *and* raising out of an exit handler is worse.
         print(f"Warning: Could not restore media keys: {e}")
         print("Reset manually with: hidutil property --set '{\"UserKeyMapping\":[]}'")
+    finally:
+        _MEDIA_KEYS_SUPPRESSED = False
 
 
 atexit.register(_restore_media_keys)
 
 
 def _sigterm_handler(signum, frame):
-    """Restore media keys and exit cleanly on SIGTERM."""
+    """Restore media keys and exit on SIGTERM.
+
+    Exits 143 (128 + SIGTERM), NOT 0.  pi_setup.sh's kiosk loop treats exit 0 as
+    "the parent pressed the exit shortcut" and stops restarting; a stray SIGTERM
+    returning 0 would therefore break out of the loop and leave an autologin
+    shell with passwordless sudo on screen in front of the child.  Zero is
+    reserved for the deliberate exit-shortcut path.
+    """
     _restore_media_keys()
     pygame.quit()
-    sys.exit(0)
+    sys.exit(143)
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)
@@ -182,20 +245,44 @@ def load_config():
                 print("Warning: Invalid config structure, using defaults")
             else:
                 print("Warning: Invalid config structure, using defaults")
-        except (json.JSONDecodeError, IOError, AttributeError, TypeError) as e:
-            # Belt and braces: the isinstance guards above should make the last
-            # two unreachable, but this function must never propagate -- it is
-            # called at module scope.
+        except (ValueError, OSError, AttributeError, TypeError) as e:
+            # ValueError (not JSONDecodeError) because a config saved in another
+            # encoding raises UnicodeDecodeError, which is a ValueError and is
+            # NOT a JSONDecodeError -- that gap crashed the game at import.
+            # OSError covers IOError.  This function must never propagate: it is
+            # called at module scope, before any UI exists to report the failure.
             print(f"Warning: Error loading config file: {e}")
 
-    # Create default config
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    # Preserve anything we are about to replace.  Reaching here with an existing
+    # file means we rejected the user's own content, and overwriting it destroys
+    # a hand-edited shortcut with no way to get it back -- on a kiosk, where the
+    # warning above goes to a console nobody reads.
     try:
-        with open(CONFIG_FILE, "w") as f:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"Warning: Could not create config directory: {e}")
+        return DEFAULT_CONFIG
+
+    replacing = CONFIG_FILE.exists()
+    if replacing:
+        backup = CONFIG_FILE.with_suffix(".json.rejected")
+        try:
+            shutil.copy2(CONFIG_FILE, backup)
+            print(f"Your previous config was kept at: {backup}")
+        except OSError as e:
+            print(f"Warning: could not back up existing config, not replacing it: {e}")
+            return DEFAULT_CONFIG
+
+    # Write atomically: a truncating write that is interrupted (a child pulling
+    # the plug on a kiosk) leaves a partial file that the next run also rejects.
+    try:
+        tmp_path = CONFIG_FILE.with_suffix(".json.tmp")
+        with open(tmp_path, "w") as f:
             json.dump(DEFAULT_CONFIG, f, indent=4)
-        print(f"Created default config file at: {CONFIG_FILE}")
-    except IOError as e:
-        print(f"Warning: Could not create config file: {e}")
+        os.replace(tmp_path, CONFIG_FILE)
+        print(f"{'Replaced' if replacing else 'Created'} config file at: {CONFIG_FILE}")
+    except OSError as e:
+        print(f"Warning: Could not write config file: {e}")
 
     return DEFAULT_CONFIG
 
@@ -220,7 +307,12 @@ def resolve_key_name(name):
 
     for candidate in (name, name.lower(), name.upper()):
         key = getattr(pygame, f"K_{candidate}", None)
-        if isinstance(key, int):
+        # `!= K_UNKNOWN` is load-bearing, not defensive noise.  pygame.K_UNKNOWN
+        # is 0 and is the one K_* constant that is not a real key, so a config of
+        # {"key": "UNKNOWN"} passes an isinstance(int) check, resolves happily,
+        # and produces a shortcut NO KEYSTROKE CAN MATCH -- the hint would read
+        # "Ctrl+Shift+Unknown" while the parent has no way out at all.
+        if isinstance(key, int) and key != pygame.K_UNKNOWN:
             return key, candidate
 
     # Unresolvable: fall back to ESCAPE, but say so.  A silent fallback makes
@@ -237,7 +329,16 @@ def resolve_key_name(name):
 def get_exit_shortcut_display(config):
     """Get a human-readable display string for the exit shortcut."""
     try:
-        shortcut = config["exit_shortcut"]
+        # Same hardening as check_exit_shortcut(): keep `shortcut` a dict
+        # whatever the config held, or the .get() calls below raise
+        # AttributeError, which the except clause does not catch.  This function
+        # is called from the title screen, the hint, and main().
+        candidate = config["exit_shortcut"]
+        shortcut = (
+            candidate
+            if isinstance(candidate, dict)
+            else DEFAULT_CONFIG["exit_shortcut"]
+        )
         parts = []
 
         if shortcut.get("ctrl", False):
@@ -594,8 +695,17 @@ def play_random_tone():
 
         # Convert to float32 for sounddevice (range -1.0 to 1.0)
         tone_float = tone.astype(np.float32) / 32767.0
-        sd.play(tone_float, 22050)
-        sd.wait()  # Wait for the tone to finish playing
+        try:
+            sd.play(tone_float, 22050)
+            sd.wait()  # Wait for the tone to finish playing
+        except Exception as e:  # noqa: BLE001 - see below
+            # SOUND_AVAILABLE only means numpy and sounddevice IMPORTED; it says
+            # nothing about a working output device.  A headless Pi, a VM, or a
+            # Mac with no output raises PortAudioError here, and neither this
+            # function nor main()'s event loop caught it -- so the game died on
+            # the first keypress.  Degrade to the visual-only mode the README
+            # already promises for "audio libraries or audio devices".
+            print(f"♪ (audio unavailable: {e})")
 
 
 def main():

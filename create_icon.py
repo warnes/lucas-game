@@ -5,7 +5,6 @@ Creates a simple colorful icon with a key symbol
 """
 
 import pygame
-import sys
 
 # Initialize Pygame
 pygame.init()

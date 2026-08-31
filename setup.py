@@ -37,8 +37,8 @@ OPTIONS = {
         "CFBundleName": "Lucas' Game",
         "CFBundleDisplayName": "Lucas' Game",
         "CFBundleIdentifier": "com.gregorywarnes.lucasgame",
-        "CFBundleVersion": "1.1.2",
-        "CFBundleShortVersionString": "1.1.2",
+        "CFBundleVersion": "1.1.3",
+        "CFBundleShortVersionString": "1.1.3",
         "NSHumanReadableCopyright": "© 2025 Gregory R. Warnes",
         "NSHighResolutionCapable": True,
     },
@@ -59,7 +59,7 @@ OPTIONS = {
 
 setup(
     name="Lucas' Game",
-    version="1.1.2",
+    version="1.1.3",
     author="Gregory R. Warnes",
     description="Fullscreen keyboard game with configurable exit shortcut and optional audio",
     license="MIT",
@@ -72,6 +72,5 @@ setup(
     # copies them out of pyproject.toml into install_requires, which py2app
     # rejects.  Py2appDistribution above is what actually clears them.
     options={"py2app": OPTIONS},
-    setup_requires=["py2app"],
     distclass=Py2appDistribution,
 )

@@ -6,6 +6,7 @@ Copyright (c) 2025 Gregory R. Warnes
 License: MIT
 """
 
+import copy
 import json
 import threading
 import time
@@ -347,6 +348,11 @@ def test_main_runs_title_then_keypress_then_exit(monkeypatch):
     calls = []
     monkeypatch.setattr(lg, "_suppress_media_keys", lambda: calls.append("suppress"))
     monkeypatch.setattr(lg, "play_random_tone", lambda: calls.append("tone"))
+    # main() reads the MODULE-LEVEL `config`, which is loaded at import time
+    # from the developer's real config file. Without pinning it, this test
+    # asserts a property of whoever's machine it runs on: a developer whose
+    # config sets a different shortcut gets a red suite on unmodified code.
+    monkeypatch.setattr(lg, "config", copy.deepcopy(lg.DEFAULT_CONFIG))
 
     def feeder():
         # show_title_screen consumes a whole event.get() batch and keeps only
@@ -370,6 +376,14 @@ def test_main_runs_title_then_keypress_then_exit(monkeypatch):
     # NB: main() has now called pygame.quit(); the autouse pygame_ready
     # fixture restores the display for subsequent tests.
 
+    # A timed-out main() thread keeps spinning on the SHARED pygame event queue
+    # for the rest of the session, stealing events posted by later tests and
+    # turning this test's failure into someone else's 133-second hang. Assert it
+    # is dead before going any further.
+    assert not runner.is_alive(), (
+        "main() thread is still running and will corrupt every later test that "
+        "uses the pygame event queue"
+    )
     assert done, "main() did not return; the exit shortcut was not honored"
     assert calls[0] == "suppress", "media keys must be suppressed on start"
     assert (
@@ -398,3 +412,182 @@ def test_ignored_keys_are_skipped_on_title_screen():
     event = lg.show_title_screen(lg.screen, lg.DEFAULT_CONFIG)
     assert event is not None
     assert event.key == pygame.K_g, "F13 should have been ignored, not consumed"
+
+
+# ---------------------------------------------------------------------------
+# Regressions from the 2026-08-31 committee review.
+# Each of these was demonstrated to FAIL against the code before its fix.
+# ---------------------------------------------------------------------------
+
+
+class TestMediaKeySafety:
+    """The only code here that mutates SYSTEM-WIDE state. Previously untested."""
+
+    def test_restore_is_a_noop_when_suppression_never_ran(self, monkeypatch):
+        """Regression: atexit fires on bare import, so `pytest` itself was
+        clearing the developer's system-wide UserKeyMapping on every run."""
+        calls = []
+        monkeypatch.setattr(lg.subprocess, "run", lambda *a, **k: calls.append(a))
+        monkeypatch.setattr(lg, "_MEDIA_KEYS_SUPPRESSED", False)
+        lg._restore_media_keys()
+        assert calls == [], "restore must not touch hidutil when we never suppressed"
+
+    def test_suppress_refuses_when_user_has_own_mappings(self, monkeypatch, capsys):
+        """We replace the whole mapping array, so suppressing on top of a
+        user's Caps-Lock remap would destroy it irrecoverably."""
+        if lg.platform.system() != "Darwin":
+            pytest.skip("macOS-only path")
+        monkeypatch.setattr(lg, "_user_has_existing_key_mappings", lambda: True)
+        calls = []
+        monkeypatch.setattr(lg.subprocess, "run", lambda *a, **k: calls.append(a))
+        monkeypatch.setattr(lg, "_MEDIA_KEYS_SUPPRESSED", False)
+        lg._suppress_media_keys()
+        assert calls == [], "must not overwrite pre-existing user key mappings"
+        assert "NOT be suppressed" in capsys.readouterr().out
+
+    def test_existing_mapping_probe_fails_safe(self, monkeypatch):
+        """If we cannot tell what the user has, assume they have something."""
+
+        def boom(*a, **k):
+            raise OSError("hidutil missing")
+
+        monkeypatch.setattr(lg.subprocess, "run", boom)
+        assert lg._user_has_existing_key_mappings() is True
+
+
+class TestAudioDeviceFailure:
+    def test_dead_output_device_does_not_crash(self, monkeypatch, capsys):
+        """Regression: SOUND_AVAILABLE only means the libraries IMPORTED.
+        A missing output device raised PortAudioError out of play_random_tone
+        and out of main()'s event loop, killing the game on the first keypress.
+        README promises a visual-only fallback for exactly this case."""
+        if not lg.SOUND_AVAILABLE:
+            pytest.skip("audio stack unavailable")
+        import sounddevice as sd
+
+        def boom(*a, **k):
+            raise sd.PortAudioError("Device unavailable")
+
+        monkeypatch.setattr(sd, "play", boom)
+        lg.play_random_tone()  # must not raise
+        assert "audio unavailable" in capsys.readouterr().out
+
+
+class TestKeyNameSentinel:
+    def test_unknown_is_rejected(self):
+        """pygame.K_UNKNOWN is 0 and is the one K_* that is not a real key.
+        It passed the isinstance(int) guard, so {"key": "UNKNOWN"} produced a
+        shortcut no keystroke could match -- locking the parent out."""
+        assert pygame.K_UNKNOWN == 0
+        key, resolved = lg.resolve_key_name("UNKNOWN")
+        assert resolved is None, "K_UNKNOWN must not count as resolved"
+        assert key == pygame.K_ESCAPE
+
+    def test_unknown_config_still_leaves_a_working_exit(self, shortcut, mods):
+        cfg = shortcut("UNKNOWN", ctrl=True, shift=True)
+        assert lg.get_exit_shortcut_display(cfg) == "Ctrl+Shift+Esc"
+        mods(CTRL_SHIFT)
+        assert lg.check_exit_shortcut(keydown(pygame.K_ESCAPE), cfg)
+
+
+class TestDisplaySiblingHardening:
+    @pytest.mark.parametrize(
+        "cfg",
+        [
+            {"exit_shortcut": "hello"},
+            {"exit_shortcut": [1, 2]},
+            {"exit_shortcut": 5},
+            {"exit_shortcut": None},
+        ],
+    )
+    def test_non_dict_shortcut_does_not_raise(self, cfg):
+        """check_exit_shortcut was hardened against these; its sibling
+        get_exit_shortcut_display was not, and raised AttributeError."""
+        assert lg.get_exit_shortcut_display(cfg) == "Ctrl+Shift+Esc"
+
+
+class TestConfigPreservation:
+    @pytest.fixture(autouse=True)
+    def _isolate(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lg, "CONFIG_DIR", tmp_path)
+        monkeypatch.setattr(lg, "CONFIG_FILE", tmp_path / "config.json")
+        self.tmp = tmp_path
+        self.cfg = tmp_path / "config.json"
+
+    def test_non_utf8_config_does_not_crash(self):
+        """Regression: UnicodeDecodeError is a ValueError, NOT a
+        JSONDecodeError, so it escaped the except clause and crashed the game
+        at import. write_text() cannot express this input -- which is exactly
+        why the original 8 regression cases could not catch it."""
+        self.cfg.write_bytes(b'{"exit_shortcut": {"key": "\xff\xfe"}}')
+        assert lg.load_config() == lg.DEFAULT_CONFIG
+
+    def test_rejected_config_is_preserved_not_destroyed(self):
+        """A parent who mistypes one field must not lose their file."""
+        original = '{"_note": "Dad set F10", "exit_shortcut": {"key": "F10", "ctrl": true, "shift": true, "alt": "false"}}'
+        self.cfg.write_text(original)
+        lg.load_config()
+        backup = self.cfg.with_suffix(".json.rejected")
+        assert backup.exists(), "the rejected config must be kept, not deleted"
+        assert backup.read_text() == original, "backup must be byte-identical"
+
+    def test_first_run_says_created_not_replaced(self, capsys):
+        assert not self.cfg.exists()
+        lg.load_config()
+        assert "Created config file" in capsys.readouterr().out
+
+    def test_replacing_says_replaced(self, capsys):
+        self.cfg.write_text("{ broken")
+        lg.load_config()
+        assert "Replaced config file" in capsys.readouterr().out
+
+
+class TestConfigGuardsAreIndependentlyDetected:
+    """Regression for an OVERDETERMINED test: the original suite passed with
+    either half of the 0e2f2b0 fix reverted, so neither half was verified.
+    These assert on the two paths separately, by their distinct output."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lg, "CONFIG_DIR", tmp_path)
+        monkeypatch.setattr(lg, "CONFIG_FILE", tmp_path / "config.json")
+        self.cfg = tmp_path / "config.json"
+
+    def test_isinstance_guard_path_rejects_without_raising(self, capsys):
+        """A non-dict exit_shortcut must be caught by the isinstance guard
+        (structure message), NOT by the except clause (error message)."""
+        self.cfg.write_text('{"exit_shortcut": "hello"}')
+        assert lg.load_config() == lg.DEFAULT_CONFIG
+        out = capsys.readouterr().out
+        assert (
+            "Invalid config structure" in out
+        ), "must be rejected by the isinstance guard, not by the except clause"
+        assert "Error loading config file" not in out
+
+    @pytest.mark.parametrize("content", ["5", "null", "true", '"hello"'])
+    def test_root_isinstance_guard_rejects_non_dict_roots(self, content, capsys):
+        """The ROOT guard, separately from the exit_shortcut guard.
+
+        Without `isinstance(config, dict)`, a scalar root reaches
+        `"exit_shortcut" in config`, which raises TypeError and is only mopped
+        up by the except clause -- so the two guards become interchangeable and
+        neither is verified. Asserting on WHICH message appears keeps them
+        independently falsifiable.
+        """
+        self.cfg.write_text(content)
+        assert lg.load_config() == lg.DEFAULT_CONFIG
+        out = capsys.readouterr().out
+        assert (
+            "Invalid config structure" in out
+        ), "a non-dict root must be rejected by the isinstance guard"
+        assert "Error loading config file" not in out, (
+            "must not reach the except clause -- that would mean the root "
+            "guard is absent and the except clause is masking it"
+        )
+
+    def test_except_clause_path_catches_decode_errors(self, capsys):
+        """Non-UTF-8 bytes cannot be caught by an isinstance guard -- only the
+        widened except clause can. Distinct message proves which fired."""
+        self.cfg.write_bytes(b"\xff\xfe\x00bad")
+        assert lg.load_config() == lg.DEFAULT_CONFIG
+        assert "Error loading config file" in capsys.readouterr().out

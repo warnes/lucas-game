@@ -57,7 +57,7 @@ README.md:          ./lucas_game.py           # Usage section
 **Config file location** (uses `platformdirs.user_config_dir`):
 - macOS: `~/Library/Application Support/lucas-game/config.json`
 - Linux: `~/.config/lucas-game/config.json`
-- Windows: `%APPDATA%\lucas-game\config.json`
+- Windows: `%LOCALAPPDATA%\warnes\lucas-game\config.json`
 
 **Exit shortcut configuration**:
 ```json
@@ -193,7 +193,7 @@ python lucas_game.py
 - **MINOR** (1.X.0): New features (new key display modes, config options)
 - **PATCH** (1.0.X): Bug fixes, documentation updates, refactoring
 
-**Version strings must be updated in ALL locations**:
+**Version strings must be updated in ALL FIVE locations** (the web port is easy to miss and drifted to 1.1.0 before 2026-08-31):
 ```python
 # 1. setup.py (3 locations)
 'CFBundleVersion': '1.0.1',
@@ -209,5 +209,5 @@ version = "1.0.1"
 **Workflow**:
 1. Make code changes
 2. Determine semver increment (major/minor/patch)
-3. Update ALL four version locations (setup.py × 3, pyproject.toml × 1)
+3. Update ALL five version locations (setup.py × 3, pyproject.toml × 1, web/package.json × 1)
 4. Commit with version in message: "chore: bump version to 1.0.1"

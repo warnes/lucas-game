@@ -126,7 +126,7 @@ The exit shortcut can be customized by editing the configuration file located at
 
 - **Linux/Unix**: `~/.config/lucas-game/config.json` (or `$XDG_CONFIG_HOME/lucas-game/config.json`)
 - **macOS**: `~/Library/Application Support/lucas-game/config.json`
-- **Windows**: `%APPDATA%\lucas-game\config.json` (typically `C:\Users\<username>\AppData\Roaming\lucas-game\config.json`)
+- **Windows**: `%LOCALAPPDATA%\warnes\lucas-game\config.json` (typically `C:\Users\<username>\AppData\Local\warnes\lucas-game\config.json`)
 
 Example configuration:
 
@@ -177,12 +177,23 @@ When audio is not available, the game continues to run and prints `♪` in the t
 While the game is running on macOS it remaps the system media and brightness
 keys to F13 using `hidutil`, so a child cannot change the volume, screen
 brightness, or media playback. The Touch Bar emits the same HID events, so it is
-covered too. The original mappings are restored when the game exits — including
-on `SIGTERM` and on an unhandled crash.
+covered too. The suppression is undone when the game exits — including on
+`SIGTERM` and on an unhandled crash.
 
-This changes system state only for the lifetime of the process. If the game is
-killed with `SIGKILL` (`kill -9`), the restore cannot run; run
-`hidutil property --set '{"UserKeyMapping":[]}'` to reset the mappings by hand.
+**If you already use `hidutil` yourself, the game leaves your mappings alone.**
+`hidutil` has a single system-wide mapping list and setting it replaces the
+whole list, so there is no way to add the game's entries without discarding
+yours and no way to put yours back afterwards. Rather than destroy them, the
+game detects existing mappings at startup, prints a note, and skips media-key
+suppression entirely for that session. A common case is a Caps Lock remap.
+
+This changes system state only for the lifetime of the process, and only when
+the game actually started — importing the module (for example, running the test
+suite) does not touch your key mappings. If the game is killed with `SIGKILL`
+(`kill -9`) the cleanup cannot run; `hidutil property --set
+'{"UserKeyMapping":[]}'` clears the remapping. Note that this command clears
+**all** user key mappings, not just the game's — which is safe only because the
+game refuses to run its suppression when you have any of your own.
 
 ## Testing
 

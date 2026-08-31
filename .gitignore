@@ -1,4 +1,13 @@
+# A trailing slash restricts a pattern to DIRECTORIES, and git does not treat a
+# symlink as a directory.  So `venv/` stops matching the moment someone points
+# venv at a checkout elsewhere -- which is a normal thing to do, and the failure
+# is silent: the path simply reappears as untracked and is one `git add -A` away
+# from being committed.  Every directory pattern below is therefore listed twice,
+# slash-less first (matches a symlink or a stray file of that name) and with the
+# slash second (matches the real directory).
+
 # Python
+__pycache__
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,12 +15,17 @@ __pycache__/
 .Python
 
 # Virtual Environment
+venv
 venv/
+env
 env/
+ENV
 ENV/
 
 # IDE
+.vscode
 .vscode/
+.idea
 .idea/
 *.swp
 *.swo
@@ -22,21 +36,37 @@ ENV/
 Thumbs.db
 
 # Mypy
+.mypy_cache
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
 # Build artifacts
+build
 build/
+dist
 dist/
+*.egg-info
 *.egg-info/
 *.icns
+*.iconset
 *.iconset/
 icon.png
 
 # Node / web
+node_modules
 node_modules/
+web/dist
 web/dist/
 
 # Agent scratch
+/tmp
 /tmp/
+
+# OBO session state — the store lives in Warnes-Innovations/confidential and is
+# reached through a symlink, so all four spellings are needed: the current name
+# and the legacy one, each as a symlink (slash-less) and as a real directory.
+.github/oboe_sessions
+.github/oboe_sessions/
+.github/obo_sessions
+.github/obo_sessions/

@@ -42,9 +42,31 @@ fi
 rm -rf build
 rm -rf "dist/Lucas' Game.app"
 mkdir -p dist
-# -f -n so this is idempotent and also repairs a broken/stale link.  It will
-# fail rather than clobber if dist/Applications is somehow a real directory.
+
+# The drag-to-install alias.  DO NOT recreate this as a bare `ln -sfn`:
+#
+#   * `ln -sfn` does NOT refuse when the destination is a real directory -- it
+#     exits 0 and nests the link INSIDE it, leaving no alias where one is
+#     expected and reporting success.  (Verified 2026-08-31; an earlier comment
+#     here claimed the opposite and was wrong.)
+#   * A live symlink to /Applications sitting in a build-output directory is a
+#     hazard, because `rm -rf dist/*/` -- with a trailing slash, the ordinary
+#     way someone clears a build dir -- RESOLVES the symlink and deletes the
+#     contents of /Applications itself.  Exit code 0, no output.  Without the
+#     trailing slash it merely unlinks.  One character apart.
+#
+# So: refuse loudly if anything unexpected is there, and verify the result
+# rather than trusting ln's exit code.
+if [ -e dist/Applications ] && [ ! -L dist/Applications ]; then
+    echo "ERROR: dist/Applications exists and is not a symlink." >&2
+    echo "       Refusing to touch it -- inspect it by hand." >&2
+    exit 1
+fi
 ln -sfn /Applications dist/Applications
+if [ "$(readlink dist/Applications)" != "/Applications" ]; then
+    echo "ERROR: dist/Applications is not the expected symlink after ln." >&2
+    exit 1
+fi
 
 # Build the application
 python setup.py py2app

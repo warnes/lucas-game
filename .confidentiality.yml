@@ -1,0 +1,53 @@
+# Copyright (c) 2025 Gregory R. Warnes
+# SPDX-License-Identifier: MIT
+#
+# Read by ~/src/agent-config/tools/check_confidential.py
+#
+# One of:
+#   public-bound   — this repository is published, or is intended to be. Scan every
+#                    commit for confidential material.
+#   always-private — this repository will never be published. Skip the scan.
+#
+# ABSENT FILE MEANS public-bound. That default is deliberate: a repository nobody has
+# classified is exactly the one where nobody has considered the question.
+intent: public-bound
+
+# This repository is ALREADY PUBLIC — `gh repo view` reports warnes/lucas-game as
+# PUBLIC. So this declaration is not a prediction, it is a description, and the
+# scanner and the visibility agree. Nothing here is speculative.
+#
+# WHY IT WAS UNCLASSIFIED UNTIL 2026-08-29: nobody had run the check against it. The
+# absent file was doing the right thing by default — check_confidential.py was already
+# treating this repo as public-bound and saying so in its output — but "correct by
+# fallback" and "correct by decision" read identically in a passing run, and only the
+# second one means somebody considered it.
+#
+# WHAT THIS OBLIGATES: every commit gets scanned for legal working papers, security
+# findings, and counsel correspondence before it lands. That is the right setting for a
+# children's game published on GitHub, and it costs nothing, because none of that
+# material has any reason to be here in the first place.
+#
+# OBO SESSION STORE — relocated 2026-08-31, with a residue that cannot be undone.
+#
+# The store now lives in Warnes-Innovations/confidential and is reached through an
+# ignored `.github/oboe_sessions` symlink; the previously-tracked copies under
+# `.github/obo_sessions/` were untracked in the same change.
+#
+# WHAT THAT DOES AND DOES NOT ACHIEVE. It stops future session state from landing
+# here. It does NOT retract the two files already published: they entered this public
+# repository in commit 6af236b and remain fetchable from history by anyone, in every
+# existing clone and fork. Untracking removes a file from the tip, not from the object
+# graph.
+#
+# REVIEWED AND ACCEPTED, 2026-08-31. Both published blobs were read in full: they
+# contain code-review notes on the web port (preventDefault, AudioContext.resume, a
+# blank-screen issue, font reflow). No credentials, no personal data, no third-party
+# or client material. Decision: accept, do not rewrite history — a force-push over a
+# published public branch costs more than this content warrants.
+#
+# That outcome was luck rather than control. A session file records whatever task was
+# in flight, so the next one could have contained anything; the relocation is what
+# makes the exposure non-recurring.
+#
+# NOT A SECRET STORE. Credentials never belong in any repository, public or private.
+# This file governs publication risk for documents; it says nothing about keys.
