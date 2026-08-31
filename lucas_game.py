@@ -106,8 +106,14 @@ def _restore_media_keys():
             check=True,
             capture_output=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+    except Exception as e:  # noqa: BLE001 - see rationale below
+        # Deliberately broad.  This is the teardown path: it runs from atexit
+        # and from the SIGTERM handler, and anything it lets escape leaves the
+        # user's media and brightness keys remapped to F13 SYSTEM-WIDE, with no
+        # obvious way to undo it.  Failing to restore is bad; failing to
+        # restore *and* raising out of an exit handler is worse.
         print(f"Warning: Could not restore media keys: {e}")
+        print('Reset manually with: hidutil property --set \'{"UserKeyMapping":[]}\'')
 
 
 atexit.register(_restore_media_keys)
@@ -152,21 +158,32 @@ def load_config():
         try:
             with open(CONFIG_FILE, "r") as f:
                 config = json.load(f)
-                # Validate required keys and structure
-                if "exit_shortcut" in config:
-                    shortcut = config["exit_shortcut"]
-                    # Check that all required fields exist and have correct types
-                    if (
-                        isinstance(shortcut.get("key"), str)
-                        and len(shortcut.get("key", "")) > 0
-                        and isinstance(shortcut.get("ctrl"), bool)
-                        and isinstance(shortcut.get("shift"), bool)
-                        and isinstance(shortcut.get("alt"), bool)
-                    ):
-                        return config
-                    else:
-                        print("Warning: Invalid config structure, using defaults")
-        except (json.JSONDecodeError, IOError) as e:
+            # Validate required keys and structure.  Check the CONTAINER types
+            # explicitly: a config of {"exit_shortcut": "hello"} would otherwise
+            # reach .get() on a str and raise AttributeError, and a config whose
+            # root is a bare scalar would raise TypeError on the `in` test.
+            # Neither is caught below, and load_config() runs at import time --
+            # so a malformed file crashed the game before the title screen.
+            if isinstance(config, dict) and isinstance(
+                config.get("exit_shortcut"), dict
+            ):
+                shortcut = config["exit_shortcut"]
+                # Check that all required fields exist and have correct types
+                if (
+                    isinstance(shortcut.get("key"), str)
+                    and len(shortcut.get("key", "")) > 0
+                    and isinstance(shortcut.get("ctrl"), bool)
+                    and isinstance(shortcut.get("shift"), bool)
+                    and isinstance(shortcut.get("alt"), bool)
+                ):
+                    return config
+                print("Warning: Invalid config structure, using defaults")
+            else:
+                print("Warning: Invalid config structure, using defaults")
+        except (json.JSONDecodeError, IOError, AttributeError, TypeError) as e:
+            # Belt and braces: the isinstance guards above should make the last
+            # two unreachable, but this function must never propagate -- it is
+            # called at module scope.
             print(f"Warning: Error loading config file: {e}")
 
     # Create default config

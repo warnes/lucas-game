@@ -37,8 +37,8 @@ OPTIONS = {
         "CFBundleName": "Lucas' Game",
         "CFBundleDisplayName": "Lucas' Game",
         "CFBundleIdentifier": "com.gregorywarnes.lucasgame",
-        "CFBundleVersion": "1.1.1",
-        "CFBundleShortVersionString": "1.1.1",
+        "CFBundleVersion": "1.1.2",
+        "CFBundleShortVersionString": "1.1.2",
         "NSHumanReadableCopyright": "© 2025 Gregory R. Warnes",
         "NSHighResolutionCapable": True,
     },
@@ -59,7 +59,7 @@ OPTIONS = {
 
 setup(
     name="Lucas' Game",
-    version="1.1.1",
+    version="1.1.2",
     author="Gregory R. Warnes",
     description="Fullscreen keyboard game with configurable exit shortcut and optional audio",
     license="MIT",

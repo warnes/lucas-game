@@ -37,3 +37,6 @@ icon.png
 # Node / web
 node_modules/
 web/dist/
+
+# Agent scratch
+/tmp/

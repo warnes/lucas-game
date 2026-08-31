@@ -223,6 +223,33 @@ class TestLoadConfig:
         self.cfg.write_text(content)
         assert lg.load_config() == lg.DEFAULT_CONFIG
 
+    @pytest.mark.parametrize(
+        "content",
+        [
+            # exit_shortcut present but not a dict -> .get() on a non-dict
+            '{"exit_shortcut": "hello"}',
+            '{"exit_shortcut": [1, 2, 3]}',
+            '{"exit_shortcut": 5}',
+            '{"exit_shortcut": null}',
+            # JSON root is not a container -> `in` raises TypeError
+            "5",
+            "null",
+            "true",
+            '"hello"',
+        ],
+    )
+    def test_wrongly_typed_config_does_not_crash(self, content):
+        """Regression: these raised AttributeError/TypeError out of
+        load_config(), which runs at MODULE SCOPE -- so a malformed config
+        file crashed the game on startup, before the title screen.
+
+        The README promises the game falls back to defaults and rewrites the
+        file when the config is malformed or wrongly typed. It must.
+        """
+        self.cfg.write_text(content)
+        assert lg.load_config() == lg.DEFAULT_CONFIG
+        assert json.loads(self.cfg.read_text()) == lg.DEFAULT_CONFIG
+
     def test_malformed_config_is_rewritten(self):
         self.cfg.write_text("{ broken")
         lg.load_config()
