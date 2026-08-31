@@ -77,15 +77,17 @@ def _suppress_media_keys():
     """Remap system media/brightness keys to F13 via hidutil (macOS only)."""
     if platform.system() != "Darwin":
         return
-    mapping = json.dumps({
-        "UserKeyMapping": [
-            {
-                "HIDKeyboardModifierMappingSrc": src,
-                "HIDKeyboardModifierMappingDst": _MACOS_MEDIA_HID_DST,
-            }
-            for src in _MACOS_MEDIA_HID_SRCS
-        ]
-    })
+    mapping = json.dumps(
+        {
+            "UserKeyMapping": [
+                {
+                    "HIDKeyboardModifierMappingSrc": src,
+                    "HIDKeyboardModifierMappingDst": _MACOS_MEDIA_HID_DST,
+                }
+                for src in _MACOS_MEDIA_HID_SRCS
+            ]
+        }
+    )
     try:
         subprocess.run(
             ["hidutil", "property", "--set", mapping],
@@ -113,7 +115,7 @@ def _restore_media_keys():
         # obvious way to undo it.  Failing to restore is bad; failing to
         # restore *and* raising out of an exit handler is worse.
         print(f"Warning: Could not restore media keys: {e}")
-        print('Reset manually with: hidutil property --set \'{"UserKeyMapping":[]}\'')
+        print("Reset manually with: hidutil property --set '{\"UserKeyMapping\":[]}'")
 
 
 atexit.register(_restore_media_keys)
