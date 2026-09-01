@@ -248,6 +248,13 @@ Two things to know about the resulting `.app`:
   Apple Silicon. Check with
   `file "dist/Lucas' Game.app/Contents/MacOS/python"`.
 
+## Raspberry Pi Kiosk
+
+The Pi is a first-class deployment target: the game runs fullscreen on the
+console framebuffer, with auto-login and auto-restart, on Raspberry Pi OS Lite —
+no desktop environment. Setup, imaging, and troubleshooting are in
+[RASPBERRY_PI_SETUP.md](RASPBERRY_PI_SETUP.md).
+
 ## Web Version
 
 A browser-based version of Lucas' Game lives in the `web/` directory. It uses
@@ -283,6 +290,12 @@ npm run dev
 - Large on-screen key display with random color theme on every key press
 - Musical tones from the C major scale via the Web Audio API
 - No installation, no dependencies at runtime — open `dist/index.html` directly
+
+## Contributing
+
+Pull requests target the `devel` branch, not `main`. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the branch layout, the test-suite
+constraints, and the parts of the code that need extra care.
 
 ## License
 
