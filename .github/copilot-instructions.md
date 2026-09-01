@@ -18,7 +18,11 @@
 **macOS Application Bundle** (`setup.py` + `build_macos.sh`):
 - Uses `py2app` to create standalone `.app` bundle
 - **CRITICAL**: `setup.py` APP list must match actual filename (`lucas_game.py`)
-- **CRITICAL**: `setup.py` packages list must match `requirements.txt`
+- **CRITICAL**: `setup.py` packages list must be a SUPERSET of `requirements.txt` — every
+  runtime dependency must appear, plus the packages py2app has to unzip. It currently adds
+  `cffi` and `_sounddevice_data`, which are deliberately absent from `requirements.txt` (see
+  "py2app Must Not Zip `_sounddevice_data`" below). Read "must match" as "must not omit"; an
+  exact-equality reading contradicts that section and would break sound in the bundle.
 - Icon generation via pygame (`create_icon.py`) → macOS iconset → `.icns`
 - Build must be from activated venv: `source venv/bin/activate`
 
@@ -53,7 +57,7 @@ README.md:          ./lucas_game.py           # Usage section
 **Config file location** (uses `platformdirs.user_config_dir`):
 - macOS: `~/Library/Application Support/lucas-game/config.json`
 - Linux: `~/.config/lucas-game/config.json`
-- Windows: `%APPDATA%\lucas-game\config.json`
+- Windows: `%LOCALAPPDATA%\warnes\lucas-game\config.json`
 
 **Exit shortcut configuration**:
 ```json
@@ -95,15 +99,20 @@ except (ImportError, NotImplementedError, OSError) as e:
 
 ### py2app Must Not Zip `_sounddevice_data`
 **Problem**: The `.app` runs silently — sound works via `python lucas_game.py` but not when launched from the Dock.
-**Cause**: py2app zips pure-Python packages into `Resources/lib/python39.zip`. `sounddevice` locates
+**Cause**: py2app zips pure-Python packages into `Resources/lib/python3XY.zip`. `sounddevice` locates
 `libportaudio.dylib` through `_sounddevice_data.__path__`, and `dlopen()` cannot read a dylib from inside a
 zip (`OSError ... errno=20`). That `OSError` is swallowed by the `SOUND_AVAILABLE` guard, so the app degrades
 to silent mode with no visible error — stderr goes nowhere when launched from the Dock.
 **Solution**: List `_sounddevice_data` (and `cffi`) in `OPTIONS["packages"]` in `setup.py`; py2app then copies
 them as real directory trees. Verify after building:
 ```bash
-ls "dist/Lucas' Game.app/Contents/Resources/lib/python3.9/_sounddevice_data/portaudio-binaries/"
+ls "dist/Lucas' Game.app/Contents/Resources/lib/"*"/_sounddevice_data/portaudio-binaries/"
 ```
+
+Use the glob, not a hardcoded `python3.9`. The interpreter directory tracks whichever Python
+built the bundle (it is `python3.14` as of 2026-08-29), so a pinned version makes this check
+print "No such file or directory" — which reads as *the sounddevice fix is broken* when it is
+fine. A verification command that fails for the wrong reason is worse than none.
 The title screen also displays the `SOUND_ERROR` text whenever sound fails, so this class of bug is visible
 without a console.
 
@@ -111,6 +120,23 @@ without a console.
 `play_random_tone()` calls `sd.wait()`, which **blocks the main thread for the full tone duration (1 second)**. To prevent key-press accumulation during that block, `pygame.event.clear(pygame.KEYDOWN)` is called immediately after. Any change to audio timing must account for this: adding async audio would require removing the `event.clear()` call or replacing it with smarter debouncing.
 
 ## Testing Workflows
+
+### Automated tests (run these first)
+```bash
+source venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```
+The suite in `tests/` runs headlessly under `SDL_VIDEODRIVER=dummy`, set in
+`tests/conftest.py` before `lucas_game` is imported — the module opens a fullscreen
+display at import time, so that ordering is load-bearing.
+
+Two things to preserve when adding tests:
+- `check_exit_shortcut()` reads **live** modifier state via `pygame.key.get_mods()`, not
+  `event.mod`. A synthetic event with `mod=...` is silently ignored; use the `mods` fixture.
+- `main()` ends with `pygame.quit()`, which tears down the video subsystem process-wide. The
+  autouse `pygame_ready` fixture re-initializes it and re-binds `lucas_game.screen`; without
+  that, every test ordered after the end-to-end one fails with "video system not initialized".
 
 ### Development Testing
 ```bash
@@ -167,7 +193,7 @@ python lucas_game.py
 - **MINOR** (1.X.0): New features (new key display modes, config options)
 - **PATCH** (1.0.X): Bug fixes, documentation updates, refactoring
 
-**Version strings must be updated in ALL locations**:
+**Version strings must be updated in ALL FIVE locations** (the web port is easy to miss and drifted to 1.1.0 before 2026-08-31):
 ```python
 # 1. setup.py (3 locations)
 'CFBundleVersion': '1.0.1',
@@ -183,5 +209,5 @@ version = "1.0.1"
 **Workflow**:
 1. Make code changes
 2. Determine semver increment (major/minor/patch)
-3. Update ALL four version locations (setup.py × 3, pyproject.toml × 1)
+3. Update ALL five version locations (setup.py × 3, pyproject.toml × 1, web/package.json × 1)
 4. Commit with version in message: "chore: bump version to 1.0.1"
