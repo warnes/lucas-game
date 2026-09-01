@@ -124,3 +124,35 @@ def test_setup_py_does_not_force_py2app_on_every_install():
         "build_macos.sh already runs `pip install py2app`"
     )
     assert "pip install py2app" in (ROOT / "build_macos.sh").read_text()
+
+
+def test_build_script_rejects_sdl2_compat():
+    """Regression, reported 2026-09-01: the .app launched from the Dock bounced
+    forever and never showed a window, while the same binary run from a terminal
+    worked.
+
+    Cause: `brew install sdl2` installs sdl2-compat (a SDL2 shim over SDL3);
+    pygame built from source linked against it; py2app bundled it; and its dylib
+    initializer calls -[NSApplication finishLaunching], which under
+    LaunchServices runs inside dlopen() holding dyld's loader lock and deadlocks
+    against AppKit's menu-bar setup -- during `import pygame`, before any window
+    exists.
+
+    py2app exits 0 in that state, so only a post-build check can catch it.
+    """
+    src = (ROOT / "build_macos.sh").read_text()
+    assert "sdl2-compat" in src, (
+        "build_macos.sh must fail the build when sdl2-compat is bundled; "
+        "otherwise the .app deadlocks on Dock launch with no error anywhere"
+    )
+    assert re.search(
+        r"strings\s+\"\$SDL_LIB\"", src
+    ), "the check must inspect the bundled dylib itself, not merely mention it"
+
+
+def test_build_script_verifies_portaudio_is_unzipped():
+    """The documented `ls ...portaudio-binaries/` check was never automated, so
+    a bundle that had silently lost audio still printed 'Build complete!'."""
+    src = (ROOT / "build_macos.sh").read_text()
+    assert "portaudio-binaries/libportaudio.dylib" in src
+    assert "_sounddevice_data" in src
