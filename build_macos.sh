@@ -6,8 +6,22 @@ set -e
 
 echo "Building Lucas' Game for macOS..."
 
-# Activate virtual environment
-source venv/bin/activate
+# Activate virtual environment.
+#
+# Override with VENV=/path/to/venv when the project venv runs a Python that has
+# no pygame wheel. pygame publishes no macOS wheel for CPython 3.14, and a
+# source build links against Homebrew's sdl2 -- which is now sdl2-compat, and
+# deadlocks the .app on Dock launch (see the post-build check below). Building
+# the bundle with a 3.11-3.13 venv avoids that without disturbing the project's
+# own environment.
+VENV="${VENV:-venv}"
+if [ ! -f "$VENV/bin/activate" ]; then
+    echo "ERROR: no virtualenv at '$VENV' (set VENV=/path/to/venv)" >&2
+    exit 1
+fi
+# shellcheck source=/dev/null
+source "$VENV/bin/activate"
+echo "Using: $(python -c 'import sys; print(sys.version.split()[0], sys.executable)')"
 
 # Install py2app if not already installed
 pip install py2app
@@ -71,6 +85,60 @@ fi
 # Build the application
 python setup.py py2app
 
+# --------------------------------------------------------------------------
+# Post-build verification. py2app exits 0 on both of the failures below, and
+# both are invisible until someone launches the bundle from the Dock -- where
+# there is no console to print to.  Fail the build instead.
+# --------------------------------------------------------------------------
+APP="dist/Lucas' Game.app"
+
+# 1. sdl2-compat must NOT be bundled.
+#
+# `brew install sdl2` now installs sdl2-compat, a SDL2 API shim over SDL3.  Its
+# dylib initializer calls -[NSApplication finishLaunching], and when the bundle
+# is launched by LaunchServices that runs inside dlopen() while dyld holds the
+# loader lock -- AppKit then tries to build the menu bar and deadlocks.  The
+# process hangs during `import pygame`, before the window is ever created, so
+# the icon bounces forever and nothing appears.  Launching the same binary from
+# a terminal does not deadlock, which is what makes this so confusing.
+#
+# Use pygame's official wheel, which bundles genuine SDL2.
+# Search the WHOLE bundle: a source build puts SDL2 in Contents/Frameworks/,
+# a wheel build puts it in Resources/lib/pythonX.Y/pygame/.dylibs/. Checking one
+# fixed path passes VACUOUSLY when the library is in the other one -- a guard
+# that cannot find its subject reports success.
+SDL_LIBS=$(find "$APP" -name "libSDL2-2.0.0.dylib" 2>/dev/null)
+if [ -z "$SDL_LIBS" ]; then
+    echo "" >&2
+    echo "ERROR: no libSDL2-2.0.0.dylib found anywhere in the bundle." >&2
+    echo "       Cannot verify which SDL2 was bundled; refusing to pass." >&2
+    exit 1
+fi
+if echo "$SDL_LIBS" | while read -r f; do strings "$f" 2>/dev/null; done | grep -q "sdl2-compat"; then
+    echo "" >&2
+    echo "ERROR: the bundle contains sdl2-compat, not genuine SDL2." >&2
+    echo "       The .app will deadlock on launch from Finder/Dock." >&2
+    echo "       Cause: pygame was built from source against Homebrew's sdl2," >&2
+    echo "       which is now sdl2-compat (a shim over SDL3)." >&2
+    echo "       Fix: build with a Python that has a pygame wheel (3.11-3.13):" >&2
+    echo "         pip uninstall -y pygame && pip install pygame" >&2
+    exit 1
+fi
+
+# 2. _sounddevice_data must be a real directory, not zipped.
+# sounddevice finds libportaudio.dylib via _sounddevice_data.__path__, and
+# dlopen() cannot read a dylib from inside py2app's zip.  The resulting OSError
+# is swallowed by the SOUND_AVAILABLE guard, so the app silently loses audio.
+if ! ls "$APP/Contents/Resources/lib/"*"/_sounddevice_data/portaudio-binaries/libportaudio.dylib" >/dev/null 2>&1; then
+    echo "" >&2
+    echo "ERROR: libportaudio.dylib is not unzipped in the bundle." >&2
+    echo "       The .app would run silently with no audio and no error." >&2
+    echo "       Fix: keep '_sounddevice_data' and 'cffi' in OPTIONS['packages']." >&2
+    exit 1
+fi
+
+echo ""
+echo "Verified: genuine SDL2 bundled, libportaudio unzipped."
 echo ""
 echo "Build complete!"
 echo "Application created: dist/Lucas' Game.app"
