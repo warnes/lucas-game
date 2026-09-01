@@ -145,9 +145,21 @@ def test_build_script_rejects_sdl2_compat():
         "build_macos.sh must fail the build when sdl2-compat is bundled; "
         "otherwise the .app deadlocks on Dock launch with no error anywhere"
     )
-    assert re.search(
-        r"strings\s+\"\$SDL_LIB\"", src
+    assert (
+        "strings" in src
     ), "the check must inspect the bundled dylib itself, not merely mention it"
+    # Must search the WHOLE bundle. A source build puts SDL2 in
+    # Contents/Frameworks/; a wheel build puts it in pygame/.dylibs/. Checking
+    # one fixed path passes VACUOUSLY when the library is in the other -- which
+    # is exactly how the first version of this guard was wrong.
+    assert re.search(
+        r'find\s+"\$APP"\s+-name\s+"libSDL2', src
+    ), "must find libSDL2 anywhere in the bundle, not at a single fixed path"
+    # And it must fail closed: a guard that cannot locate its subject has to
+    # refuse, not report success.
+    assert re.search(
+        r'\[\s+-z\s+"\$SDL_LIBS"\s+\]', src
+    ), "must refuse when no libSDL2 is found, rather than passing vacuously"
 
 
 def test_build_script_verifies_portaudio_is_unzipped():
