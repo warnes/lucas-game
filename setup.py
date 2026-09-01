@@ -41,6 +41,18 @@ OPTIONS = {
         "CFBundleShortVersionString": "1.1.4",
         "NSHumanReadableCopyright": "© 2025 Gregory R. Warnes",
         "NSHighResolutionCapable": True,
+        # Opt out of macOS persistent-UI (window) restoration.
+        #
+        # Without this, once the app has any crash history -- which a kiosk
+        # accumulates, since the usual way it ends is being killed -- macOS
+        # shows -[NSPersistentUIRestorer promptToIgnorePersistentStateWithCrashHistory:]
+        # on the NEXT launch. That is a MODAL NSAlert, and behind a fullscreen
+        # SDL window it is invisible: the app hangs in -[NSAlert runModal]
+        # waiting for a click nobody can see, looking exactly like a freeze.
+        #
+        # A fullscreen game has no window state worth restoring, so there is
+        # nothing to lose by turning it off.
+        "NSQuitAlwaysKeepsWindows": False,
     },
     # Listing a package here makes py2app copy it as a real directory tree
     # instead of zipping it into python39.zip.  _sounddevice_data must be

@@ -6,8 +6,22 @@ set -e
 
 echo "Building Lucas' Game for macOS..."
 
-# Activate virtual environment
-source venv/bin/activate
+# Activate virtual environment.
+#
+# Override with VENV=/path/to/venv when the project venv runs a Python that has
+# no pygame wheel. pygame publishes no macOS wheel for CPython 3.14, and a
+# source build links against Homebrew's sdl2 -- which is now sdl2-compat, and
+# deadlocks the .app on Dock launch (see the post-build check below). Building
+# the bundle with a 3.11-3.13 venv avoids that without disturbing the project's
+# own environment.
+VENV="${VENV:-venv}"
+if [ ! -f "$VENV/bin/activate" ]; then
+    echo "ERROR: no virtualenv at '$VENV' (set VENV=/path/to/venv)" >&2
+    exit 1
+fi
+# shellcheck source=/dev/null
+source "$VENV/bin/activate"
+echo "Using: $(python -c 'import sys; print(sys.version.split()[0], sys.executable)')"
 
 # Install py2app if not already installed
 pip install py2app
@@ -89,8 +103,18 @@ APP="dist/Lucas' Game.app"
 # a terminal does not deadlock, which is what makes this so confusing.
 #
 # Use pygame's official wheel, which bundles genuine SDL2.
-SDL_LIB="$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
-if [ -f "$SDL_LIB" ] && strings "$SDL_LIB" 2>/dev/null | grep -q "sdl2-compat"; then
+# Search the WHOLE bundle: a source build puts SDL2 in Contents/Frameworks/,
+# a wheel build puts it in Resources/lib/pythonX.Y/pygame/.dylibs/. Checking one
+# fixed path passes VACUOUSLY when the library is in the other one -- a guard
+# that cannot find its subject reports success.
+SDL_LIBS=$(find "$APP" -name "libSDL2-2.0.0.dylib" 2>/dev/null)
+if [ -z "$SDL_LIBS" ]; then
+    echo "" >&2
+    echo "ERROR: no libSDL2-2.0.0.dylib found anywhere in the bundle." >&2
+    echo "       Cannot verify which SDL2 was bundled; refusing to pass." >&2
+    exit 1
+fi
+if echo "$SDL_LIBS" | while read -r f; do strings "$f" 2>/dev/null; done | grep -q "sdl2-compat"; then
     echo "" >&2
     echo "ERROR: the bundle contains sdl2-compat, not genuine SDL2." >&2
     echo "       The .app will deadlock on launch from Finder/Dock." >&2
