@@ -1,0 +1,99 @@
+# Runs the test suite. Until this existed, nothing ran it except a person
+# choosing to -- CONTRIBUTING.md said so in as many words, which made the suite
+# documentation rather than a gate.
+#
+# Actions are pinned to commit SHAs, not tags. A tag is mutable: whoever controls
+# the action repository can repoint v7 at different code, and this workflow runs
+# with a checkout of the repository.
+name: tests
+
+on:
+  push:
+    branches: [devel, main]
+  pull_request:
+    branches: [devel, main]
+  workflow_dispatch:
+
+# Least privilege: this job only needs to read the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # sounddevice dlopen()s libportaudio at import. Without it the import
+      # fails, SOUND_AVAILABLE goes False, and the audio tests SKIP rather than
+      # run -- a skip is not a pass, and it is invisible next to a green tick.
+      # Installing it deliberately keeps a skip meaningful.
+      - name: Install PortAudio (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,audio]"
+
+      # -rs reports the reason for every skip. The suite is headless via
+      # SDL_VIDEODRIVER=dummy, which tests/conftest.py sets before importing
+      # lucas_game -- the module opens a fullscreen display at import time, so
+      # that ordering is load-bearing and must not move.
+      - name: Run tests
+        run: pytest -rs
+
+      # Names the audio outcome instead of letting a skip hide inside a pass.
+      # SOUND_AVAILABLE only means the libraries imported; it says nothing about
+      # a working device, and a runner has none.
+      - name: Report audio availability
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+          import lucas_game
+          print(f"SOUND_AVAILABLE={lucas_game.SOUND_AVAILABLE}")
+          print(f"SOUND_ERROR={lucas_game.SOUND_ERROR!r}")
+          PY
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install tools
+        run: pip install black codespell
+
+      # Formatting only -- does not fail on lucas_game.py's pre-existing style.
+      - name: black --check
+        run: black --check tests/ setup.py
+
+      - name: codespell
+        run: codespell README.md CONTRIBUTING.md docs/ tests/ lucas_game.py setup.py
+
+      - name: shellcheck
+        run: shellcheck --severity=warning build_macos.sh pi_setup.sh
