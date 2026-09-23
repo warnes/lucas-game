@@ -124,3 +124,47 @@ def test_setup_py_does_not_force_py2app_on_every_install():
         "build_macos.sh already runs `pip install py2app`"
     )
     assert "pip install py2app" in (ROOT / "build_macos.sh").read_text()
+
+
+def test_build_script_rejects_sdl2_compat():
+    """Regression, reported 2026-09-01: the .app launched from the Dock bounced
+    forever and never showed a window, while the same binary run from a terminal
+    worked.
+
+    Cause: `brew install sdl2` installs sdl2-compat (a SDL2 shim over SDL3);
+    pygame built from source linked against it; py2app bundled it; and its dylib
+    initializer calls -[NSApplication finishLaunching], which under
+    LaunchServices runs inside dlopen() holding dyld's loader lock and deadlocks
+    against AppKit's menu-bar setup -- during `import pygame`, before any window
+    exists.
+
+    py2app exits 0 in that state, so only a post-build check can catch it.
+    """
+    src = (ROOT / "build_macos.sh").read_text()
+    assert "sdl2-compat" in src, (
+        "build_macos.sh must fail the build when sdl2-compat is bundled; "
+        "otherwise the .app deadlocks on Dock launch with no error anywhere"
+    )
+    assert (
+        "strings" in src
+    ), "the check must inspect the bundled dylib itself, not merely mention it"
+    # Must search the WHOLE bundle. A source build puts SDL2 in
+    # Contents/Frameworks/; a wheel build puts it in pygame/.dylibs/. Checking
+    # one fixed path passes VACUOUSLY when the library is in the other -- which
+    # is exactly how the first version of this guard was wrong.
+    assert re.search(
+        r'find\s+"\$APP"\s+-name\s+"libSDL2', src
+    ), "must find libSDL2 anywhere in the bundle, not at a single fixed path"
+    # And it must fail closed: a guard that cannot locate its subject has to
+    # refuse, not report success.
+    assert re.search(
+        r'\[\s+-z\s+"\$SDL_LIBS"\s+\]', src
+    ), "must refuse when no libSDL2 is found, rather than passing vacuously"
+
+
+def test_build_script_verifies_portaudio_is_unzipped():
+    """The documented `ls ...portaudio-binaries/` check was never automated, so
+    a bundle that had silently lost audio still printed 'Build complete!'."""
+    src = (ROOT / "build_macos.sh").read_text()
+    assert "portaudio-binaries/libportaudio.dylib" in src
+    assert "_sounddevice_data" in src

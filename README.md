@@ -41,26 +41,36 @@ git clone https://github.com/warnes/lucas-game.git
 cd lucas-game
 ```
 
-1. Install SDL2 libraries via Homebrew (required for pygame font and mixer modules):
-
-```bash
-brew install sdl2 sdl2_mixer sdl2_ttf sdl2_image
-```
-
 1. Create a virtual environment and install the dependencies:
 
 ```bash
-python -m venv venv
+python3.13 -m venv venv       # see the interpreter note below
 source venv/bin/activate
-pip install platformdirs numpy sounddevice
+pip install pygame platformdirs numpy sounddevice
 ```
 
-1. Build pygame from source (to link with the installed SDL2 libraries):
+**Use pygame's binary wheel — do not build it from source, and do not
+`brew install sdl2`.** Earlier versions of this README told you to do both,
+because macOS pygame wheels once shipped without working font and mixer
+support. That is no longer true (verified on pygame 2.6.1: `pygame.font` and
+`pygame.mixer` both initialize from the wheel), and following the old advice now
+produces an app that **hangs on launch from the Dock**:
 
-```bash
-pip cache remove pygame  # Clear any cached wheels
-pip install pygame --no-binary :all:
-```
+- `brew install sdl2` today installs **sdl2-compat**, a SDL2-API shim over SDL3.
+- Building pygame from source links it against that shim, and `build_macos.sh`
+  bundles the shim into the `.app`.
+- sdl2-compat's dylib initializer calls `-[NSApplication finishLaunching]`. Under
+  LaunchServices that runs inside `dlopen()` while dyld holds the loader lock,
+  AppKit tries to build the menu bar, and the process **deadlocks during
+  `import pygame`** — before any window is created. The icon bounces forever and
+  nothing appears. Running the very same binary from a terminal works fine,
+  which makes this easy to misdiagnose.
+
+`build_macos.sh` now fails the build if sdl2-compat ends up in the bundle.
+
+**Interpreter note**: pygame does not yet publish macOS wheels for CPython
+3.14, so build the app with **Python 3.11–3.13**. The game itself runs fine on
+3.14; it is only the `.app` bundle that needs a wheel-provided SDL2.
 
 1. Install the game itself:
 

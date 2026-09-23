@@ -75,14 +75,37 @@ README.md:          ./lucas_game.py           # Usage section
 
 ## Dependencies & Platform Quirks
 
-### pygame Font/Mixer Issue (macOS)
-**Problem**: macOS pygame binary wheels often lack SDL2 font/mixer support  
-**Solution**: Build from source after installing SDL2 via Homebrew:
+### DO NOT build pygame from source on macOS (reversed 2026-09-01)
+
+This section used to say the opposite — "macOS pygame binary wheels often lack
+SDL2 font/mixer support, so `brew install sdl2` and `pip install pygame
+--no-binary :all:`". **That advice is now actively harmful.** It is recorded here
+rather than deleted because it is plausible, it was correct once, and someone
+will otherwise reintroduce it.
+
+**Why it broke**: `brew install sdl2` today installs **sdl2-compat**, a SDL2-API
+shim over SDL3. pygame built from source links against it, py2app bundles it, and
+sdl2-compat's dylib initializer calls `-[NSApplication finishLaunching]`. Launched
+by LaunchServices that runs inside `dlopen()` under dyld's loader lock; AppKit
+tries to build the menu bar and **deadlocks during `import pygame`**, before
+`pygame.display.set_mode()` is ever reached. Symptom: Dock icon bounces forever,
+no window, no crash report, and `sample` shows 100% of samples parked in
+`runInitializersBottomUp` → `NSApplication finishLaunching` → `__psynch_mutexwait`.
+The identical binary run from a terminal does not deadlock.
+
+**Why the original reason no longer applies**: verified 2026-09-01 on pygame
+2.6.1 from the wheel — `pygame.font.init()`, `pygame.font.Font(None, 48).render()`
+and `pygame.mixer.init()` all succeed. The wheel bundles genuine SDL 2.28.4.
+
+**Do this instead**:
 ```bash
-brew install sdl2 sdl2_mixer sdl2_ttf sdl2_image
-pip cache remove pygame
-pip install pygame --no-binary :all:
+pip install pygame          # the wheel, with genuine SDL2
 ```
+`build_macos.sh` fails the build if `strings` finds `sdl2-compat` in the bundled
+`libSDL2-2.0.0.dylib`, so this cannot regress silently.
+
+**Interpreter constraint**: pygame publishes no macOS wheel for CPython 3.14, so
+the `.app` must be built with Python 3.11–3.13. The game itself runs on 3.14.
 
 ### Sound Availability Pattern
 ```python
